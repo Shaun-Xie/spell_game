@@ -3,12 +3,26 @@ import { averagePoint, calculateAngle, distance2D } from './utils.js';
 export const GESTURE_THRESHOLDS = {
   // Main gesture-tuning section:
   // Raise or lower these values to make finger extension checks stricter or looser.
-  fingerStraightAngle: 160,
-  fingerReachRatio: 1.18,
-  fingerLiftPadding: 0.015,
-  thumbStraightAngle: 150,
-  thumbSpreadRatio: 1.08,
-  thumbHorizontalPadding: 0.015,
+  fingerStraightAngle: 158,
+  fingerReachRatio: 1.16,
+  fingerWristReachRatio: 1.12,
+  relaxedFingerStraightAngle: 146,
+  relaxedFingerReachRatio: 1.1,
+  relaxedFingerWristReachRatio: 1.05,
+  thumbStraightAngle: 146,
+  thumbReachRatio: 1.1,
+  thumbSpreadRatio: 1.18,
+  thumbHorizontalPadding: 0.018,
+  thumbAnchorTravel: 0.015,
+  relaxedThumbStraightAngle: 136,
+  relaxedThumbReachRatio: 1.04,
+  relaxedThumbSpreadRatio: 1.08,
+  relaxedThumbHorizontalPadding: 0.01,
+  openPalmFingerSpreadRatio: 1.58,
+  openPalmAverageTipDistanceRatio: 1.36,
+  openPalmSupportTipDistanceRatio: 1.24,
+  fistTipClusterRatio: 1.32,
+  fistFingerSpreadRatio: 1.45,
 };
 
 export const STABILITY_SETTINGS = {
@@ -41,85 +55,202 @@ const FINGER_POINTS = {
   pinky: { tip: 20, pip: 18, mcp: 17 },
 };
 
+const LONG_FINGER_KEYS = ['index', 'middle', 'ring', 'pinky'];
+
 function getPalmCenter(landmarks) {
   return averagePoint([landmarks[0], landmarks[5], landmarks[9], landmarks[13], landmarks[17]]);
 }
 
-function isFingerExtended(landmarks, fingerKey, thresholds = GESTURE_THRESHOLDS) {
+function createRatio(numerator, denominator) {
+  return numerator / Math.max(denominator, 0.0001);
+}
+
+function normalizeX(point, handedness) {
+  return handedness === 'Right' ? 1 - point.x : point.x;
+}
+
+function getHandGeometry(landmarks, handedness) {
+  const wrist = landmarks[0];
+  const palmCenter = getPalmCenter(landmarks);
+  const palmWidth = distance2D(landmarks[5], landmarks[17]);
+  const palmHeight = distance2D(wrist, landmarks[9]);
+  const palmSize = Math.max(palmWidth, palmHeight, 0.0001);
+
+  return {
+    wrist,
+    palmCenter,
+    palmWidth,
+    palmHeight,
+    palmSize,
+    handedness,
+  };
+}
+
+function getFingerMetrics(landmarks, fingerKey, geometry, thresholds = GESTURE_THRESHOLDS) {
   const { tip, pip, mcp } = FINGER_POINTS[fingerKey];
   const tipPoint = landmarks[tip];
   const pipPoint = landmarks[pip];
   const mcpPoint = landmarks[mcp];
-  const palmCenter = getPalmCenter(landmarks);
+  const { palmCenter, wrist } = geometry;
 
   const angle = calculateAngle(tipPoint, pipPoint, mcpPoint);
-  const reachRatio =
-    distance2D(tipPoint, palmCenter) / Math.max(distance2D(pipPoint, palmCenter), 0.0001);
-  const lifted = tipPoint.y < pipPoint.y - thresholds.fingerLiftPadding;
+  const palmReachRatio = createRatio(
+    distance2D(tipPoint, palmCenter),
+    distance2D(pipPoint, palmCenter),
+  );
+  const wristReachRatio = createRatio(
+    distance2D(tipPoint, wrist),
+    distance2D(pipPoint, wrist),
+  );
+  const tipDistanceRatio = createRatio(distance2D(tipPoint, palmCenter), geometry.palmSize);
+  const extended =
+    angle >= thresholds.fingerStraightAngle &&
+    palmReachRatio >= thresholds.fingerReachRatio &&
+    wristReachRatio >= thresholds.fingerWristReachRatio;
+  const relaxedExtended =
+    angle >= thresholds.relaxedFingerStraightAngle &&
+    palmReachRatio >= thresholds.relaxedFingerReachRatio &&
+    wristReachRatio >= thresholds.relaxedFingerWristReachRatio;
 
-  return angle > thresholds.fingerStraightAngle && reachRatio > thresholds.fingerReachRatio && lifted;
+  return {
+    angle,
+    palmReachRatio,
+    wristReachRatio,
+    tipDistanceRatio,
+    extended,
+    relaxedExtended,
+  };
 }
 
-function isThumbExtended(landmarks, handedness = 'Right', thresholds = GESTURE_THRESHOLDS) {
+function getThumbMetrics(landmarks, geometry, thresholds = GESTURE_THRESHOLDS) {
   const { tip, pip, mcp, anchor } = FINGER_POINTS.thumb;
   const tipPoint = landmarks[tip];
   const ipPoint = landmarks[pip];
   const mcpPoint = landmarks[mcp];
   const anchorPoint = landmarks[anchor];
+  const canonicalTipX = normalizeX(tipPoint, geometry.handedness);
+  const canonicalIpX = normalizeX(ipPoint, geometry.handedness);
+  const canonicalAnchorX = normalizeX(anchorPoint, geometry.handedness);
   const angle = calculateAngle(tipPoint, ipPoint, mcpPoint);
-  const spreadRatio =
-    distance2D(tipPoint, anchorPoint) / Math.max(distance2D(mcpPoint, anchorPoint), 0.0001);
-  const isRightHand = handedness === 'Right';
-  const horizontalSpread = isRightHand
-    ? tipPoint.x < ipPoint.x - thresholds.thumbHorizontalPadding
-    : tipPoint.x > ipPoint.x + thresholds.thumbHorizontalPadding;
+  const spreadRatio = createRatio(
+    distance2D(tipPoint, anchorPoint),
+    distance2D(mcpPoint, anchorPoint),
+  );
+  const palmReachRatio = createRatio(
+    distance2D(tipPoint, geometry.palmCenter),
+    distance2D(ipPoint, geometry.palmCenter),
+  );
+  const horizontalTravel = canonicalTipX - canonicalIpX;
+  const anchorTravel = canonicalTipX - canonicalAnchorX;
+  const extended =
+    angle >= thresholds.thumbStraightAngle &&
+    palmReachRatio >= thresholds.thumbReachRatio &&
+    spreadRatio >= thresholds.thumbSpreadRatio &&
+    horizontalTravel >= thresholds.thumbHorizontalPadding &&
+    anchorTravel >= thresholds.thumbAnchorTravel;
+  const relaxedExtended =
+    angle >= thresholds.relaxedThumbStraightAngle &&
+    palmReachRatio >= thresholds.relaxedThumbReachRatio &&
+    spreadRatio >= thresholds.relaxedThumbSpreadRatio &&
+    horizontalTravel >= thresholds.relaxedThumbHorizontalPadding;
 
-  return angle > thresholds.thumbStraightAngle && spreadRatio > thresholds.thumbSpreadRatio && horizontalSpread;
+  return {
+    angle,
+    spreadRatio,
+    palmReachRatio,
+    horizontalTravel,
+    anchorTravel,
+    extended,
+    relaxedExtended,
+  };
 }
 
 export function getFingerStates(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
+  const geometry = getHandGeometry(landmarks, handedness);
+  const fingerMetrics = {
+    thumb: getThumbMetrics(landmarks, geometry, thresholds),
+    index: getFingerMetrics(landmarks, 'index', geometry, thresholds),
+    middle: getFingerMetrics(landmarks, 'middle', geometry, thresholds),
+    ring: getFingerMetrics(landmarks, 'ring', geometry, thresholds),
+    pinky: getFingerMetrics(landmarks, 'pinky', geometry, thresholds),
+  };
+
   return {
-    thumb: isThumbExtended(landmarks, handedness, thresholds),
-    index: isFingerExtended(landmarks, 'index', thresholds),
-    middle: isFingerExtended(landmarks, 'middle', thresholds),
-    ring: isFingerExtended(landmarks, 'ring', thresholds),
-    pinky: isFingerExtended(landmarks, 'pinky', thresholds),
+    thumb: fingerMetrics.thumb.extended,
+    index: fingerMetrics.index.extended,
+    middle: fingerMetrics.middle.extended,
+    ring: fingerMetrics.ring.extended,
+    pinky: fingerMetrics.pinky.extended,
+    metrics: fingerMetrics,
+    geometry,
   };
 }
 
 export function classifyGesture(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
-  const fingerStates = getFingerStates(landmarks, handedness, thresholds);
-  const extendedLongFingers = ['index', 'middle', 'ring', 'pinky'].filter(
+  const fingerStateBundle = getFingerStates(landmarks, handedness, thresholds);
+  const { geometry, metrics } = fingerStateBundle;
+  const fingerStates = {
+    thumb: fingerStateBundle.thumb,
+    index: fingerStateBundle.index,
+    middle: fingerStateBundle.middle,
+    ring: fingerStateBundle.ring,
+    pinky: fingerStateBundle.pinky,
+  };
+  const extendedLongFingers = LONG_FINGER_KEYS.filter(
     (fingerKey) => fingerStates[fingerKey],
   );
+  const relaxedLongFingers = LONG_FINGER_KEYS.filter(
+    (fingerKey) => metrics[fingerKey].relaxedExtended,
+  );
+  const averageLongFingerTipDistanceRatio =
+    LONG_FINGER_KEYS.reduce((total, fingerKey) => total + metrics[fingerKey].tipDistanceRatio, 0) /
+    LONG_FINGER_KEYS.length;
+  const fingerFanSpreadRatio = createRatio(
+    distance2D(landmarks[FINGER_POINTS.index.tip], landmarks[FINGER_POINTS.pinky.tip]),
+    geometry.palmWidth,
+  );
+  const ringReadyForOpenPalm =
+    metrics.ring.relaxedExtended ||
+    metrics.ring.tipDistanceRatio >= thresholds.openPalmSupportTipDistanceRatio;
+  const pinkyReadyForOpenPalm =
+    metrics.pinky.relaxedExtended ||
+    metrics.pinky.tipDistanceRatio >= thresholds.openPalmSupportTipDistanceRatio;
+  const openPalmFingerConfidence =
+    extendedLongFingers.length >= 3 || metrics.thumb.relaxedExtended;
+
+  const looksLikeOpenPalm =
+    openPalmFingerConfidence &&
+    metrics.index.extended &&
+    metrics.middle.extended &&
+    ringReadyForOpenPalm &&
+    pinkyReadyForOpenPalm &&
+    fingerFanSpreadRatio >= thresholds.openPalmFingerSpreadRatio &&
+    averageLongFingerTipDistanceRatio >= thresholds.openPalmAverageTipDistanceRatio;
+
+  const looksLikeClosedFist =
+    extendedLongFingers.length === 0 &&
+    !metrics.thumb.relaxedExtended &&
+    averageLongFingerTipDistanceRatio <= thresholds.fistTipClusterRatio &&
+    fingerFanSpreadRatio <= thresholds.fistFingerSpreadRatio;
 
   let rawGesture = 'UNKNOWN';
 
-  if (
-    !fingerStates.thumb &&
-    extendedLongFingers.length === 0
-  ) {
+  if (looksLikeClosedFist) {
     rawGesture = 'CLOSED_FIST';
-  } else if (
-    fingerStates.index &&
-    fingerStates.middle &&
-    fingerStates.ring &&
-    fingerStates.pinky &&
-    (fingerStates.thumb || extendedLongFingers.length === 4)
-  ) {
+  } else if (looksLikeOpenPalm) {
     rawGesture = 'OPEN_PALM';
   } else if (
     fingerStates.index &&
-    !fingerStates.middle &&
-    !fingerStates.ring &&
-    !fingerStates.pinky
+    !metrics.middle.relaxedExtended &&
+    !metrics.ring.relaxedExtended &&
+    !metrics.pinky.relaxedExtended
   ) {
     rawGesture = 'INDEX_ONLY';
   } else if (
     fingerStates.index &&
     fingerStates.middle &&
-    !fingerStates.ring &&
-    !fingerStates.pinky
+    !metrics.ring.relaxedExtended &&
+    !metrics.pinky.relaxedExtended
   ) {
     rawGesture = 'INDEX_MIDDLE';
   }
@@ -129,6 +260,13 @@ export function classifyGesture(landmarks, handedness, thresholds = GESTURE_THRE
     rawGestureLabel: RAW_GESTURE_LABELS[rawGesture],
     spell: GESTURE_TO_SPELL[rawGesture] ?? null,
     fingerStates,
+    diagnostics: {
+      geometry,
+      relaxedLongFingers,
+      averageLongFingerTipDistanceRatio,
+      fingerFanSpreadRatio,
+      metrics,
+    },
   };
 }
 

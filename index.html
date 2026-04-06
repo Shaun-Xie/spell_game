@@ -78,7 +78,7 @@
         <main class="mt-6 grid flex-1 gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.92fr)]">
           <section
             data-reveal
-            class="arcane-panel stage-panel flex min-h-[38rem] flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5"
+            class="arcane-panel stage-panel flex self-start flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5"
           >
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
               <div>
@@ -94,12 +94,12 @@
               </div>
             </div>
 
-            <div class="relative mt-4 flex-1">
-              <div id="stageViewport" class="video-frame relative h-full min-h-[24rem] overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/80">
+            <div class="relative mt-4">
+              <div id="stageViewport" class="video-frame stage-viewport relative mx-auto w-full overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/80">
                 <div class="scanner-line pointer-events-none absolute inset-x-10 top-6 z-20 hidden h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent sm:block"></div>
                 <video
                   id="webcam"
-                  class="mirrored absolute inset-0 z-0 h-full w-full object-contain"
+                  class="mirrored absolute inset-0 z-0 h-full w-full object-contain object-center"
                   autoplay
                   muted
                   playsinline

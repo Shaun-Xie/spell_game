@@ -180,6 +180,19 @@ body {
   z-index: 2;
 }
 
+.stage-panel {
+  align-self: start;
+}
+
+.stage-viewport {
+  aspect-ratio: 16 / 10;
+  min-height: 20rem;
+  max-height: min(34rem, 62vh);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 26px 60px rgba(0, 0, 0, 0.34);
+}
+
 .mirrored {
   transform: scaleX(-1);
 }
@@ -366,6 +379,12 @@ body {
 
 .scanner-line {
   animation: scanner 2.8s ease-in-out infinite;
+}
+
+@media (min-width: 1024px) {
+  .stage-viewport {
+    aspect-ratio: 16 / 9;
+  }
 }
 
 @keyframes scanner {

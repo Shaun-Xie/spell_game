@@ -97,8 +97,43 @@ export function createUI() {
     volume: 0.24,
   });
 
+  function getStageMetrics() {
+    const viewportWidth = refs.stageViewport.clientWidth;
+    const viewportHeight = refs.stageViewport.clientHeight;
+    const videoWidth = refs.video.videoWidth || viewportWidth || 1;
+    const videoHeight = refs.video.videoHeight || viewportHeight || 1;
+    const viewportAspectRatio = viewportWidth / Math.max(viewportHeight, 1);
+    const videoAspectRatio = videoWidth / Math.max(videoHeight, 1);
+
+    let contentWidth = viewportWidth;
+    let contentHeight = viewportHeight;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    // The video uses object-contain, so landmarks must be drawn inside the
+    // displayed video rectangle rather than stretched across the whole stage.
+    if (viewportAspectRatio > videoAspectRatio) {
+      contentHeight = viewportHeight;
+      contentWidth = contentHeight * videoAspectRatio;
+      offsetX = (viewportWidth - contentWidth) / 2;
+    } else {
+      contentWidth = viewportWidth;
+      contentHeight = contentWidth / videoAspectRatio;
+      offsetY = (viewportHeight - contentHeight) / 2;
+    }
+
+    return {
+      viewportWidth,
+      viewportHeight,
+      contentWidth,
+      contentHeight,
+      offsetX,
+      offsetY,
+    };
+  }
+
   function syncOverlaySize() {
-    const bounds = refs.overlay.getBoundingClientRect();
+    const bounds = refs.stageViewport.getBoundingClientRect();
     const devicePixelRatio = window.devicePixelRatio || 1;
 
     refs.overlay.width = Math.round(bounds.width * devicePixelRatio);
@@ -178,7 +213,8 @@ export function createUI() {
   }
 
   function clearOverlay() {
-    overlayContext.clearRect(0, 0, refs.overlay.clientWidth, refs.overlay.clientHeight);
+    const { viewportWidth, viewportHeight } = getStageMetrics();
+    overlayContext.clearRect(0, 0, viewportWidth, viewportHeight);
   }
 
   function drawHandOverlay(landmarks, spellName = 'Neutral') {
@@ -189,31 +225,42 @@ export function createUI() {
 
     clearOverlay();
 
-    const width = refs.overlay.clientWidth;
-    const height = refs.overlay.clientHeight;
+    const {
+      contentWidth,
+      contentHeight,
+      offsetX,
+      offsetY,
+    } = getStageMetrics();
     const theme = getSpellTheme(spellName);
+    const scale = Math.max(0.8, Math.min(contentWidth / 960, 1.05));
 
-    overlayContext.lineWidth = 2.4;
+    overlayContext.lineWidth = 2.1 * scale;
     overlayContext.strokeStyle = `rgba(${theme.rgb}, 0.78)`;
     overlayContext.fillStyle = `rgba(${theme.rgb}, 0.92)`;
     overlayContext.shadowColor = `rgba(${theme.rgb}, 0.34)`;
-    overlayContext.shadowBlur = 18;
+    overlayContext.shadowBlur = 15 * scale;
 
     HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {
       const start = landmarks[startIndex];
       const end = landmarks[endIndex];
 
       overlayContext.beginPath();
-      overlayContext.moveTo(start.x * width, start.y * height);
-      overlayContext.lineTo(end.x * width, end.y * height);
+      overlayContext.moveTo(offsetX + start.x * contentWidth, offsetY + start.y * contentHeight);
+      overlayContext.lineTo(offsetX + end.x * contentWidth, offsetY + end.y * contentHeight);
       overlayContext.stroke();
     });
 
     landmarks.forEach((landmark, index) => {
-      const radius = index % 4 === 0 ? 4.4 : 3.2;
+      const radius = (index % 4 === 0 ? 4 : 3) * scale;
 
       overlayContext.beginPath();
-      overlayContext.arc(landmark.x * width, landmark.y * height, radius, 0, Math.PI * 2);
+      overlayContext.arc(
+        offsetX + landmark.x * contentWidth,
+        offsetY + landmark.y * contentHeight,
+        radius,
+        0,
+        Math.PI * 2,
+      );
       overlayContext.fill();
     });
   }
