@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Mage Hands is a browser-based spellcasting prototype that recognizes webcam hand gestures in real time."
+    />
+    <meta name="theme-color" content="#050914" />
+    <title>Mage Hands</title>
+  </head>
+  <body class="min-h-full">
+    <div
+      id="appShell"
+      data-spell-theme="Neutral"
+      class="app-shell relative isolate min-h-screen overflow-hidden px-4 py-5 text-slate-100 sm:px-6 lg:px-8"
+    >
+      <div class="ambient-grid pointer-events-none absolute inset-0 opacity-60"></div>
+      <div class="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,rgba(110,231,249,0.18),transparent_62%)]"></div>
+      <div class="absolute right-[-10rem] top-28 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.18),transparent_68%)] blur-3xl"></div>
+      <div class="absolute bottom-[-8rem] left-[-6rem] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.14),transparent_70%)] blur-3xl"></div>
+
+      <div class="relative mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-7xl flex-col">
+        <header
+          data-reveal
+          class="arcane-panel flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between"
+        >
+          <div class="space-y-3">
+            <div class="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.32em] text-cyan-100/85">
+              <i data-lucide="sparkles" class="h-4 w-4"></i>
+              Arcane Webcam Prototype
+            </div>
+            <div>
+              <p class="font-display text-3xl tracking-[0.2em] text-white sm:text-4xl lg:text-[2.85rem]">
+                Mage Hands
+              </p>
+              <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                Real-time spell recognition powered by webcam input, hand landmarks, and rule-based gesture logic.
+              </p>
+            </div>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
+            <div class="hud-tile">
+              <p class="hud-label">Camera</p>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <span class="inline-flex items-center gap-2 text-sm text-slate-200">
+                  <i data-lucide="video" class="h-4 w-4 text-cyan-200"></i>
+                  Live Feed
+                </span>
+                <span id="cameraStatusBadge" class="status-badge status-badge--loading">Starting</span>
+              </div>
+            </div>
+            <div class="hud-tile">
+              <p class="hud-label">Tracker</p>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <span class="inline-flex items-center gap-2 text-sm text-slate-200">
+                  <i data-lucide="cpu" class="h-4 w-4 text-cyan-200"></i>
+                  Hand Model
+                </span>
+                <span id="modelStatusBadge" class="status-badge status-badge--loading">Loading</span>
+              </div>
+            </div>
+            <div class="hud-tile">
+              <p class="hud-label">Tracking</p>
+              <div class="mt-2 flex items-center justify-between gap-3">
+                <span class="inline-flex items-center gap-2 text-sm text-slate-200">
+                  <i data-lucide="hand" class="h-4 w-4 text-cyan-200"></i>
+                  Hand State
+                </span>
+                <span id="handStatusBadge" class="status-badge status-badge--idle">Stand By</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main class="mt-6 grid flex-1 gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.92fr)]">
+          <section
+            data-reveal
+            class="arcane-panel stage-panel flex min-h-[38rem] flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
+              <div>
+                <p class="font-display text-xl tracking-[0.16em] text-white sm:text-2xl">Spellcasting Lens</p>
+                <p class="mt-1 text-sm text-slate-400">
+                  Webcam preview with live hand landmarks and gesture confirmation feedback.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
+                <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Single Hand</span>
+                <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Live Inference</span>
+                <span id="cameraResolution" class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Awaiting video</span>
+              </div>
+            </div>
+
+            <div class="relative mt-4 flex-1">
+              <div id="stageViewport" class="video-frame relative h-full min-h-[24rem] overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/80">
+                <div class="scanner-line pointer-events-none absolute inset-x-10 top-6 z-20 hidden h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent sm:block"></div>
+                <video
+                  id="webcam"
+                  class="mirrored absolute inset-0 z-0 h-full w-full object-contain"
+                  autoplay
+                  muted
+                  playsinline
+                ></video>
+                <canvas id="landmarkOverlay" class="mirrored absolute inset-0 z-10 h-full w-full"></canvas>
+
+                <div class="pointer-events-none absolute inset-x-4 top-4 z-20 flex items-start justify-between gap-3">
+                  <div class="glass-pill">
+                    <i data-lucide="radar" class="h-4 w-4 text-cyan-200"></i>
+                    <span>Landmark debug overlay active</span>
+                  </div>
+                  <div id="stageGestureBadge" class="glass-pill">
+                    <i data-lucide="wand-sparkles" class="h-4 w-4 text-cyan-200"></i>
+                    <span>No spell</span>
+                  </div>
+                </div>
+
+                <div id="stageNotice" class="stage-notice stage-notice--neutral absolute inset-x-5 top-1/2 z-20 -translate-y-1/2 rounded-3xl px-5 py-5 text-center sm:inset-x-auto sm:left-6 sm:max-w-sm sm:translate-y-0 sm:text-left">
+                  <p id="stageNoticeTitle" class="font-display text-lg tracking-[0.14em] text-white">Initializing arcane sensor</p>
+                  <p id="stageNoticeHint" class="mt-2 text-sm leading-6 text-slate-300">
+                    Preparing the webcam feed and loading the hand tracking model.
+                  </p>
+                  <button
+                    id="cameraRetryButton"
+                    type="button"
+                    class="mt-4 inline-flex hidden items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/35 hover:bg-cyan-400/12"
+                  >
+                    <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+                    Retry setup
+                  </button>
+                </div>
+
+                <div class="pointer-events-none absolute inset-x-4 bottom-4 z-20 grid gap-3 md:grid-cols-[1.3fr_1fr]">
+                  <div id="spellReadoutCard" class="spell-readout rounded-[24px] border border-white/10 bg-slate-950/72 px-5 py-4 backdrop-blur-xl">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <p class="text-[0.72rem] font-semibold uppercase tracking-[0.3em] text-slate-400">Stable Spell</p>
+                        <p id="stageSpellName" class="mt-2 font-display text-2xl tracking-[0.16em] text-white">No spell</p>
+                        <p id="stageSpellDetail" class="mt-2 text-sm text-slate-300">
+                          Hold one of the mapped gestures steady to confirm a cast.
+                        </p>
+                      </div>
+                      <div class="relative">
+                        <div class="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(var(--spell-accent-rgb),0.35),transparent_65%)] blur-xl"></div>
+                        <div class="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/6">
+                          <i data-lucide="sparkles" class="h-7 w-7 text-[var(--spell-accent)]"></i>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-1">
+                    <div class="spell-chip">
+                      <p class="hud-label">Raw Gesture</p>
+                      <p id="stageRawGesture" class="mt-2 text-lg font-semibold text-white">No hand detected</p>
+                    </div>
+                    <div class="spell-chip">
+                      <p class="hud-label">Cooldown</p>
+                      <p id="stageCooldown" class="mt-2 text-lg font-semibold text-white">Ready</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="space-y-6">
+            <section data-reveal class="arcane-panel px-5 py-5 sm:px-6">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="font-display text-xl tracking-[0.14em] text-white">Status Panel</p>
+                  <p class="mt-1 text-sm text-slate-400">Live system readout for the webcam and spell classifier.</p>
+                </div>
+                <div class="rounded-2xl border border-cyan-300/12 bg-cyan-300/8 p-3 text-cyan-100">
+                  <i data-lucide="scroll-text" class="h-5 w-5"></i>
+                </div>
+              </div>
+
+              <dl class="mt-5 space-y-3">
+                <div class="status-row">
+                  <dt class="status-row__label">Camera Status</dt>
+                  <dd id="cameraStatusText" class="status-row__value">Waiting to start</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Model Status</dt>
+                  <dd id="modelStatusText" class="status-row__value">Loading Hand Landmarker</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Hand Status</dt>
+                  <dd id="handStatusText" class="status-row__value">No hand detected</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Raw Gesture</dt>
+                  <dd id="rawGestureText" class="status-row__value">No hand detected</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Stable Spell</dt>
+                  <dd id="stableSpellText" class="status-row__value spell-value">No spell</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Cooldown</dt>
+                  <dd id="cooldownText" class="status-row__value">Ready</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Debug Message</dt>
+                  <dd id="debugMessageText" class="status-row__value">Boot sequence started.</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section data-reveal class="arcane-panel px-5 py-5 sm:px-6">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="font-display text-xl tracking-[0.14em] text-white">Spellbook</p>
+                  <p class="mt-1 text-sm text-slate-400">Mapped hand poses for the demo build.</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
+                  <i data-lucide="circle-help" class="h-5 w-5"></i>
+                </div>
+              </div>
+
+              <div class="mt-5 grid gap-3">
+                <article class="spell-card spell-card--fireball">
+                  <div class="spell-card__icon"><i data-lucide="flame" class="h-5 w-5"></i></div>
+                  <div>
+                    <p class="spell-card__title">Fireball</p>
+                    <p class="spell-card__hint">Closed fist</p>
+                  </div>
+                </article>
+                <article class="spell-card spell-card--shield">
+                  <div class="spell-card__icon"><i data-lucide="shield" class="h-5 w-5"></i></div>
+                  <div>
+                    <p class="spell-card__title">Shield</p>
+                    <p class="spell-card__hint">Open palm</p>
+                  </div>
+                </article>
+                <article class="spell-card spell-card--lightning">
+                  <div class="spell-card__icon"><i data-lucide="zap" class="h-5 w-5"></i></div>
+                  <div>
+                    <p class="spell-card__title">Lightning</p>
+                    <p class="spell-card__hint">Index finger only</p>
+                  </div>
+                </article>
+                <article class="spell-card spell-card--heal">
+                  <div class="spell-card__icon"><i data-lucide="heart-pulse" class="h-5 w-5"></i></div>
+                  <div>
+                    <p class="spell-card__title">Heal</p>
+                    <p class="spell-card__hint">Index + middle fingers</p>
+                  </div>
+                </article>
+              </div>
+
+              <div class="mt-5 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
+                Keep your hand centered, spread your fingers clearly, and pause on each gesture for a few frames so the spell can stabilize.
+              </div>
+            </section>
+
+            <section data-reveal class="arcane-panel px-5 py-5 sm:px-6">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="font-display text-xl tracking-[0.14em] text-white">Arcane Log</p>
+                  <p class="mt-1 text-sm text-slate-400">Recent startup, tracking, and cast events.</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
+                  <i data-lucide="triangle-alert" class="h-5 w-5"></i>
+                </div>
+              </div>
+
+              <ul id="debugLog" class="mt-5 space-y-3 text-sm text-slate-300"></ul>
+            </section>
+          </aside>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
