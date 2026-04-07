@@ -22,11 +22,13 @@ If no mapped pose is held steadily enough, the HUD shows `No spell`.
 
 - The player mage is anchored on the left side of the battlefield.
 - Enemies spawn on the right and move left across a horizontal combat lane.
-- `Fireball` launches a glowing projectile that travels toward the nearest enemy.
-- `Lightning` instantly strikes the nearest enemy with a beam.
-- `Heal` restores player HP and plays a healing pulse around the mage.
-- `Freeze` launches an icy shard with frost burst feedback on hit. It is a visual/control spell identity for now and does not slow enemies yet.
-- Score increases when enemies are defeated.
+- There are three enemy archetypes:
+  - `Ember` enemies are defeated by `Fireball`
+  - `Storm` enemies are defeated by `Lightning`
+  - `Frost` enemies are defeated by `Freeze`
+- Matching the correct spell defeats that enemy in one hit and awards score.
+- Using the wrong attack spell shows impact feedback, but the enemy survives.
+- `Heal` restores player HP and never damages enemies.
 - The battle ends when player HP reaches `0`.
 - Use the on-screen restart button or press `R` / `Enter` after game over to reset the fight.
 
@@ -93,6 +95,7 @@ Main gameplay tuning points:
 - Player HP: `src/game.js` inside `GAME_SETTINGS.playerMaxHp`
 - Spawn behavior: `src/game.js` inside `GAME_SETTINGS.maxActiveEnemies`, `spawnIntervalMinMs`, and `spawnIntervalMaxMs`
 - Contact damage: `src/game.js` inside `GAME_SETTINGS.enemyContactDamage`
+- Wrong-spell feedback and pushback: `src/game.js` inside `MATCH_SETTINGS`
 - Fireball / lightning / heal / freeze numbers: `src/spells.js` inside `SPELL_CONFIG`
 - Freeze cast pulse and projectile tuning: `src/spells.js` inside `SPELL_CONFIG.Freeze`
 - Projectile speed: `src/spells.js` inside `SPELL_CONFIG.Fireball.projectileSpeed`

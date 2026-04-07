@@ -21,7 +21,7 @@
       <div class="absolute right-[-10rem] top-28 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.18),transparent_68%)] blur-3xl"></div>
       <div class="absolute bottom-[-8rem] left-[-6rem] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(16,185,129,0.14),transparent_70%)] blur-3xl"></div>
 
-      <div class="relative mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-7xl flex-col">
+      <div class="relative mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col">
         <header
           data-reveal
           class="arcane-panel flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between"
@@ -36,8 +36,8 @@
                 Mage Hands
               </p>
               <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Hold the left-side ward, cast spells with one hand, and stop incoming enemies before
-                they break through the lane.
+                Match each incoming enemy to its counter-spell, heal when needed, and defend the
+                left side of the lane with one-handed casting.
               </p>
             </div>
           </div>
@@ -76,111 +76,30 @@
           </div>
         </header>
 
-        <main class="mt-6 grid flex-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,0.92fr)]">
-          <section
-            data-reveal
-            class="arcane-panel flex flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
-              <div>
-                <p class="font-display text-xl tracking-[0.16em] text-white sm:text-2xl">
-                  Arcane Battle Lane
-                </p>
-                <p class="mt-1 text-sm text-slate-400">
-                  The mage holds the left-side platform while enemies surge in from the right.
-                </p>
-              </div>
-              <div class="flex flex-wrap gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
-                <span id="gameStateBadge" class="status-badge status-badge--ready">Battle Running</span>
-                <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">One-Hand Control</span>
-              </div>
-            </div>
-
-            <div class="relative mt-4">
-              <div
-                id="arenaViewport"
-                class="arena-viewport relative mx-auto w-full overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/80"
-              >
-                <canvas id="gameCanvas" class="arena-canvas absolute inset-0 z-0 h-full w-full"></canvas>
-
-                <div class="pointer-events-none absolute inset-x-4 top-4 z-20 grid gap-3 sm:grid-cols-4">
-                  <div class="arena-stat">
-                    <p class="arena-stat__label">HP</p>
-                    <p id="arenaHpValue" class="arena-stat__value">100 / 100</p>
-                  </div>
-                  <div class="arena-stat">
-                    <p class="arena-stat__label">Score</p>
-                    <p id="arenaScoreValue" class="arena-stat__value">0</p>
-                  </div>
-                  <div class="arena-stat">
-                    <p class="arena-stat__label">Enemies</p>
-                    <p id="arenaEnemiesValue" class="arena-stat__value">0</p>
-                  </div>
-                <div class="arena-stat">
-                  <p class="arena-stat__label">Freeze</p>
-                  <p id="arenaFreezeValue" class="arena-stat__value">Idle</p>
-                </div>
-                </div>
-
-                <div class="pointer-events-none absolute inset-x-4 bottom-4 z-20 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div class="arena-feed">
-                    <p class="hud-label">Battle Feed</p>
-                    <p id="arenaFeedText" class="mt-2 max-w-xl text-sm leading-6 text-slate-200">
-                      Raise one hand, hold a mapped spell, and defend the lane.
-                    </p>
-                  </div>
-                  <div class="glass-pill">
-                    <i data-lucide="gauge" class="h-4 w-4 text-cyan-200"></i>
-                    <span>Player holds the left lane</span>
-                  </div>
-                </div>
-
-                <div id="gameOverOverlay" class="arena-overlay is-hidden absolute inset-0 z-30 flex items-center justify-center px-6">
-                  <div class="arena-overlay__card">
-                    <p id="gameOverTitle" class="font-display text-2xl tracking-[0.16em] text-white">
-                      The Ward Has Fallen
-                    </p>
-                    <p id="gameOverText" class="mt-3 text-sm leading-6 text-slate-300">
-                      Final score 0. Enemies defeated: 0.
-                    </p>
-                    <button
-                      id="gameRestartButton"
-                      type="button"
-                      class="arena-button mt-5 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-cyan-300/35 hover:bg-cyan-400/12"
-                    >
-                      <i data-lucide="refresh-cw" class="h-4 w-4"></i>
-                      Restart Battle
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <aside class="space-y-6">
+        <main class="mt-6 flex flex-1 flex-col gap-6">
+          <section class="top-stage-grid grid gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)] xl:items-start">
             <section
               data-reveal
-              class="arcane-panel stage-panel flex flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5"
+              class="arcane-panel lens-panel order-2 flex flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5 xl:order-1"
             >
-              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
+              <div class="flex flex-col gap-3 border-b border-white/8 pb-4">
                 <div>
                   <p class="font-display text-xl tracking-[0.16em] text-white sm:text-2xl">
                     Spellcasting Lens
                   </p>
                   <p class="mt-1 text-sm text-slate-400">
-                    Webcam preview with live hand landmarks and confirmed spell readout.
+                    Compact webcam monitor with the live landmark overlay and spell tracking readout.
                   </p>
                 </div>
-                <div class="flex flex-wrap gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
+                <div class="flex flex-wrap gap-2 text-[0.64rem] uppercase tracking-[0.22em] text-slate-400">
                   <span id="trackingModePill" class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Legacy One-Hand</span>
-                  <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Live Inference</span>
                   <span id="cameraResolution" class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Awaiting video</span>
                 </div>
               </div>
 
-              <div class="relative mt-4">
-                <div id="stageViewport" class="video-frame lens-viewport relative mx-auto w-full overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/80">
-                  <div class="scanner-line pointer-events-none absolute inset-x-10 top-6 z-20 hidden h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent sm:block"></div>
+              <div class="mt-4">
+                <div id="stageViewport" class="video-frame stage-viewport lens-viewport relative mx-auto w-full overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/80">
+                  <div class="scanner-line pointer-events-none absolute inset-x-8 top-5 z-20 hidden h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent sm:block"></div>
                   <video
                     id="webcam"
                     class="mirrored absolute inset-0 z-0 h-full w-full object-contain object-center"
@@ -189,69 +108,151 @@
                     playsinline
                   ></video>
                   <canvas id="landmarkOverlay" class="mirrored absolute inset-0 z-10 h-full w-full"></canvas>
+                </div>
+              </div>
 
-                  <div class="pointer-events-none absolute inset-x-4 top-4 z-20 flex items-start justify-between gap-3">
+              <div class="lens-toolbar mt-4 flex flex-wrap gap-2">
+                <div class="glass-pill glass-pill--compact">
+                  <i data-lucide="radar" class="h-3.5 w-3.5 text-cyan-200"></i>
+                  <span>Live inference</span>
+                </div>
+                <div id="stageGestureBadge" class="glass-pill glass-pill--compact">
+                  <i data-lucide="wand-sparkles" class="h-3.5 w-3.5 text-cyan-200"></i>
+                  <span>No spell</span>
+                </div>
+              </div>
+
+              <div class="lens-panel__meta mt-4 grid gap-3">
+                <div id="spellReadoutCard" class="spell-readout rounded-[22px] border border-white/10 bg-slate-950/72 px-4 py-4 backdrop-blur-xl">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate-400">Stable Spell</p>
+                      <p id="stageSpellName" class="mt-2 font-display text-xl tracking-[0.14em] text-white sm:text-2xl">No spell</p>
+                      <p id="stageSpellDetail" class="mt-2 text-xs leading-5 text-slate-300 sm:text-sm sm:leading-6">
+                        Hold one of the mapped gestures steady to confirm a cast.
+                      </p>
+                    </div>
+                    <div class="relative shrink-0">
+                      <div class="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(var(--spell-accent-rgb),0.35),transparent_65%)] blur-xl"></div>
+                      <div class="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 sm:h-16 sm:w-16">
+                        <i data-lucide="sparkles" class="h-6 w-6 text-[var(--spell-accent)] sm:h-7 sm:w-7"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div class="spell-chip">
+                    <p id="stageRawGestureLabel" class="hud-label">Raw Gesture</p>
+                    <p id="stageRawGesture" class="mt-2 text-base font-semibold text-white sm:text-lg">No hand detected</p>
+                  </div>
+                  <div class="spell-chip">
+                    <p class="hud-label">Cooldown</p>
+                    <p id="stageCooldown" class="mt-2 text-base font-semibold text-white sm:text-lg">Ready</p>
+                  </div>
+                </div>
+
+                <div id="stageNotice" class="stage-notice stage-notice--neutral rounded-[22px] px-4 py-4 text-left">
+                  <p id="stageNoticeTitle" class="font-display text-sm tracking-[0.14em] text-white sm:text-base">
+                    Initializing arcane sensor
+                  </p>
+                  <p id="stageNoticeHint" class="mt-2 text-xs leading-5 text-slate-300 sm:text-sm sm:leading-6">
+                    Preparing the webcam feed and loading the hand tracking model.
+                  </p>
+                  <button
+                    id="cameraRetryButton"
+                    type="button"
+                    class="mt-4 inline-flex hidden items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/35 hover:bg-cyan-400/12"
+                  >
+                    <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+                    Retry setup
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section
+              data-reveal
+              class="arcane-panel battle-panel order-1 flex flex-col overflow-hidden px-4 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6 xl:order-2"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/8 pb-4">
+                <div>
+                  <p class="font-display text-xl tracking-[0.16em] text-white sm:text-2xl">
+                    Arcane Battle Lane
+                  </p>
+                  <p class="mt-1 max-w-3xl text-sm text-slate-400">
+                    The mage holds the left-side platform while enemies surge in from the right. The battle canvas stays clear while the spellcasting lens monitors your hand beside it.
+                  </p>
+                </div>
+                <div class="flex flex-wrap gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
+                  <span id="gameStateBadge" class="status-badge status-badge--ready">Battle Running</span>
+                  <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">One-Hand Control</span>
+                </div>
+              </div>
+
+              <div class="battle-stage-shell relative mt-5">
+                <div
+                  id="arenaViewport"
+                  class="arena-viewport battle-stage relative mx-auto w-full overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80"
+                >
+                  <canvas id="gameCanvas" class="arena-canvas absolute inset-0 z-0 h-full w-full"></canvas>
+
+                  <div class="pointer-events-none absolute inset-x-4 top-4 z-20 grid gap-3 sm:grid-cols-4 xl:max-w-[48rem]">
+                    <div class="arena-stat">
+                      <p class="arena-stat__label">HP</p>
+                      <p id="arenaHpValue" class="arena-stat__value">100 / 100</p>
+                    </div>
+                    <div class="arena-stat">
+                      <p class="arena-stat__label">Score</p>
+                      <p id="arenaScoreValue" class="arena-stat__value">0</p>
+                    </div>
+                    <div class="arena-stat">
+                      <p class="arena-stat__label">Enemies</p>
+                      <p id="arenaEnemiesValue" class="arena-stat__value">0</p>
+                    </div>
+                    <div class="arena-stat">
+                      <p class="arena-stat__label">Freeze</p>
+                      <p id="arenaFreezeValue" class="arena-stat__value">Idle</p>
+                    </div>
+                  </div>
+
+                  <div class="arena-stage-meta pointer-events-none absolute bottom-4 right-4 z-20 flex max-w-[28rem] flex-col items-end gap-3">
+                    <div class="arena-feed">
+                      <p class="hud-label">Battle Feed</p>
+                      <p id="arenaFeedText" class="mt-2 text-sm leading-6 text-slate-200">
+                        Match Fireball to Ember, Lightning to Storm, and Freeze to Frost.
+                      </p>
+                    </div>
                     <div class="glass-pill">
-                      <i data-lucide="radar" class="h-4 w-4 text-cyan-200"></i>
-                      <span>Landmark overlay active</span>
-                    </div>
-                    <div id="stageGestureBadge" class="glass-pill">
-                      <i data-lucide="wand-sparkles" class="h-4 w-4 text-cyan-200"></i>
-                      <span>No spell</span>
+                      <i data-lucide="gauge" class="h-4 w-4 text-cyan-200"></i>
+                      <span>Player holds the left lane</span>
                     </div>
                   </div>
 
-                  <div id="stageNotice" class="stage-notice stage-notice--neutral absolute inset-x-5 top-1/2 z-20 -translate-y-1/2 rounded-3xl px-5 py-5 text-center sm:inset-x-auto sm:left-6 sm:max-w-sm sm:translate-y-0 sm:text-left">
-                    <p id="stageNoticeTitle" class="font-display text-lg tracking-[0.14em] text-white">
-                      Initializing arcane sensor
-                    </p>
-                    <p id="stageNoticeHint" class="mt-2 text-sm leading-6 text-slate-300">
-                      Preparing the webcam feed and loading the hand tracking model.
-                    </p>
-                    <button
-                      id="cameraRetryButton"
-                      type="button"
-                      class="mt-4 inline-flex hidden items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/35 hover:bg-cyan-400/12"
-                    >
-                      <i data-lucide="refresh-cw" class="h-4 w-4"></i>
-                      Retry setup
-                    </button>
-                  </div>
-
-                  <div class="pointer-events-none absolute inset-x-4 bottom-4 z-20 grid gap-3">
-                    <div id="spellReadoutCard" class="spell-readout rounded-[24px] border border-white/10 bg-slate-950/72 px-5 py-4 backdrop-blur-xl">
-                      <div class="flex items-center justify-between gap-3">
-                        <div>
-                          <p class="text-[0.72rem] font-semibold uppercase tracking-[0.3em] text-slate-400">Stable Spell</p>
-                          <p id="stageSpellName" class="mt-2 font-display text-2xl tracking-[0.16em] text-white">No spell</p>
-                          <p id="stageSpellDetail" class="mt-2 text-sm text-slate-300">
-                            Hold one of the mapped gestures steady to confirm a cast.
-                          </p>
-                        </div>
-                        <div class="relative">
-                          <div class="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(var(--spell-accent-rgb),0.35),transparent_65%)] blur-xl"></div>
-                          <div class="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/6">
-                            <i data-lucide="sparkles" class="h-7 w-7 text-[var(--spell-accent)]"></i>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="grid gap-3 sm:grid-cols-2">
-                      <div class="spell-chip">
-                        <p id="stageRawGestureLabel" class="hud-label">Raw Gesture</p>
-                        <p id="stageRawGesture" class="mt-2 text-lg font-semibold text-white">No hand detected</p>
-                      </div>
-                      <div class="spell-chip">
-                        <p class="hud-label">Cooldown</p>
-                        <p id="stageCooldown" class="mt-2 text-lg font-semibold text-white">Ready</p>
-                      </div>
+                  <div id="gameOverOverlay" class="arena-overlay is-hidden absolute inset-0 z-30 flex items-center justify-center px-6">
+                    <div class="arena-overlay__card">
+                      <p id="gameOverTitle" class="font-display text-2xl tracking-[0.16em] text-white">
+                        The Ward Has Fallen
+                      </p>
+                      <p id="gameOverText" class="mt-3 text-sm leading-6 text-slate-300">
+                        Final score 0. Enemies defeated: 0.
+                      </p>
+                      <button
+                        id="gameRestartButton"
+                        type="button"
+                        class="arena-button mt-5 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-5 py-2.5 text-sm font-semibold text-white transition hover:border-cyan-300/35 hover:bg-cyan-400/12"
+                      >
+                        <i data-lucide="refresh-cw" class="h-4 w-4"></i>
+                        Restart Battle
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
             </section>
+          </section>
 
+          <section class="grid gap-6 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.18fr)_minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
             <section data-reveal class="arcane-panel px-5 py-5 sm:px-6">
               <div class="flex items-center justify-between gap-3">
                 <div>
@@ -263,7 +264,7 @@
                 </div>
               </div>
 
-              <dl class="mt-5 space-y-3">
+              <dl class="status-grid mt-5 grid gap-3 md:grid-cols-2">
                 <div class="status-row">
                   <dt class="status-row__label">Gesture Mode</dt>
                   <dd id="gestureModeText" class="status-row__value">Legacy one-hand</dd>
@@ -320,7 +321,7 @@
                   <dt class="status-row__label">Game State</dt>
                   <dd id="gameStateText" class="status-row__value">Lane secure</dd>
                 </div>
-                <div class="status-row">
+                <div class="status-row md:col-span-2">
                   <dt class="status-row__label">Debug Message</dt>
                   <dd id="debugMessageText" class="status-row__value">Boot sequence started.</dd>
                 </div>
@@ -338,39 +339,39 @@
                 </div>
               </div>
 
-              <div class="mt-5 grid gap-3">
+              <div class="mt-5 grid gap-3 sm:grid-cols-2">
                 <article class="spell-card spell-card--fireball">
                   <div class="spell-card__icon"><i data-lucide="flame" class="h-5 w-5"></i></div>
                   <div>
                     <p id="spellCardFireballTitle" class="spell-card__title">Fireball</p>
-                    <p id="spellCardFireballHint" class="spell-card__hint">Closed fist</p>
+                    <p id="spellCardFireballHint" class="spell-card__hint">Closed fist · Ember</p>
                   </div>
                 </article>
                 <article class="spell-card spell-card--freeze">
                   <div class="spell-card__icon"><i data-lucide="snowflake" class="h-5 w-5"></i></div>
                   <div>
                     <p id="spellCardFreezeTitle" class="spell-card__title">Freeze</p>
-                    <p id="spellCardFreezeHint" class="spell-card__hint">Thumbs up</p>
+                    <p id="spellCardFreezeHint" class="spell-card__hint">Thumbs up · Frost</p>
                   </div>
                 </article>
                 <article class="spell-card spell-card--lightning">
                   <div class="spell-card__icon"><i data-lucide="zap" class="h-5 w-5"></i></div>
                   <div>
                     <p id="spellCardLightningTitle" class="spell-card__title">Lightning</p>
-                    <p id="spellCardLightningHint" class="spell-card__hint">Index finger only</p>
+                    <p id="spellCardLightningHint" class="spell-card__hint">Index finger only · Storm</p>
                   </div>
                 </article>
                 <article class="spell-card spell-card--heal">
                   <div class="spell-card__icon"><i data-lucide="heart-pulse" class="h-5 w-5"></i></div>
                   <div>
                     <p id="spellCardHealTitle" class="spell-card__title">Heal</p>
-                    <p id="spellCardHealHint" class="spell-card__hint">Index + middle</p>
+                    <p id="spellCardHealHint" class="spell-card__hint">Index + middle · Restore HP</p>
                   </div>
                 </article>
               </div>
 
               <div id="spellbookBodyText" class="mt-5 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
-                Defend the left-side ward with one hand. Hold a mapped pose long enough for it to stabilize, then the battle lane responds to the confirmed spell.
+                Match Fireball to Ember, Lightning to Storm, and Freeze to Frost. Heal restores HP and keeps the mage alive between threats.
               </div>
             </section>
 
@@ -387,7 +388,7 @@
 
               <ul id="debugLog" class="mt-5 space-y-3 text-sm text-slate-300"></ul>
             </section>
-          </aside>
+          </section>
         </main>
       </div>
     </div>

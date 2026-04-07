@@ -1,4 +1,10 @@
-import { clamp, randomRange, rgbaFromRgbString } from './utils.js';
+import {
+  ENEMY_ARCHETYPE_KEYS,
+  clamp,
+  getEnemyArchetype,
+  randomRange,
+  rgbaFromRgbString,
+} from './utils.js';
 import {
   SPELL_CONFIG,
   applySpellCast,
@@ -10,8 +16,6 @@ export const GAME_SETTINGS = {
   playerMaxHp: 100,
   playerRadius: 34,
   enemyRadius: 28,
-  enemyHpMin: 34,
-  enemyHpMax: 48,
   enemySpeedMin: 62,
   enemySpeedMax: 92,
   enemyContactDamage: 16,
@@ -19,6 +23,12 @@ export const GAME_SETTINGS = {
   spawnIntervalMinMs: 1200,
   spawnIntervalMaxMs: 2300,
   laneYFactors: [0.34, 0.54, 0.74],
+};
+
+export const MATCH_SETTINGS = {
+  wrongSpellPushbackPx: 16,
+  wrongSpellFlashMs: 260,
+  wrongSpellParticleCount: 10,
 };
 
 function createGameError(name, message) {
@@ -69,10 +79,30 @@ function createInitialState() {
     defeatedEnemies: 0,
     spawnCooldownMs: 900,
     gameOver: false,
-    feedText: 'Raise one hand, cast a spell, and defend the lane.',
+    feedText: 'Match Fireball to Ember, Lightning to Storm, and Freeze to Frost.',
     nextEnemyId: 1,
     nextProjectileId: 1,
   };
+}
+
+function getSpellImpactColor(spellName) {
+  if (spellName === 'Fireball') {
+    return '251 146 60';
+  }
+
+  if (spellName === 'Lightning') {
+    return '250 204 21';
+  }
+
+  if (spellName === 'Freeze') {
+    return '191 219 254';
+  }
+
+  if (spellName === 'Heal') {
+    return '52 211 153';
+  }
+
+  return '110 231 249';
 }
 
 function resolveLayout(width, height) {
@@ -152,21 +182,25 @@ export function createGame({
   }
 
   function createEnemy(now) {
-    const hp = Math.round(randomRange(GAME_SETTINGS.enemyHpMin, GAME_SETTINGS.enemyHpMax));
     const laneIndex = Math.floor(randomRange(0, layout.laneYs.length));
+    const typeKey = ENEMY_ARCHETYPE_KEYS[Math.floor(randomRange(0, ENEMY_ARCHETYPE_KEYS.length))];
+    const archetype = getEnemyArchetype(typeKey);
 
     return {
       id: state.nextEnemyId++,
+      type: archetype.key,
+      weaknessSpell: archetype.spell,
       x: layout.spawnX + randomRange(0, viewportWidth * 0.08),
       y: layout.laneYs[laneIndex],
       laneIndex,
       radius: GAME_SETTINGS.enemyRadius,
       speed: randomRange(GAME_SETTINGS.enemySpeedMin, GAME_SETTINGS.enemySpeedMax),
-      hp,
-      maxHp: hp,
+      hp: 1,
+      maxHp: 1,
       bobOffset: randomRange(0, Math.PI * 2),
       hitFlash: 0,
       hitFlashMs: 0,
+      hitFlashColor: archetype.rgb,
       spawnFlashMs: 260,
     };
   }
@@ -178,12 +212,13 @@ export function createGame({
     }
 
     const enemy = createEnemy(now);
+    const archetype = getEnemyArchetype(enemy.type);
     state.enemies.push(enemy);
     state.particles.push(
       ...createBurstParticles({
         x: enemy.x,
         y: getEnemyY(enemy, now),
-        color: '244 114 182',
+        color: archetype.rgb,
         count: 12,
         minSpeed: 30,
         maxSpeed: 140,
@@ -194,7 +229,7 @@ export function createGame({
       createRingEffect({
         x: enemy.x,
         y: getEnemyY(enemy, now),
-        color: '244 114 182',
+        color: archetype.rgb,
         maxRadius: enemy.radius * 1.8,
         lifeMs: 420,
         lineWidth: 2,
@@ -216,15 +251,9 @@ export function createGame({
   }
 
   function defeatEnemy(enemy, now, spellName = 'Neutral') {
+    const archetype = getEnemyArchetype(enemy.type);
     const scoreValue = SPELL_CONFIG[spellName]?.scoreValue ?? 10;
-    const burstColor =
-      spellName === 'Lightning'
-        ? '250 204 21'
-        : spellName === 'Fireball'
-          ? '251 146 60'
-          : spellName === 'Freeze'
-            ? '191 219 254'
-            : '110 231 249';
+    const burstColor = getSpellImpactColor(spellName);
 
     state.score += scoreValue;
     state.defeatedEnemies += 1;
@@ -249,7 +278,80 @@ export function createGame({
         lifeMs: 520,
       }),
     );
-    pushBattleEvent('Enemy defeated', `Score +${scoreValue}.`);
+    pushBattleEvent('Correct spell', `${spellName} shattered the ${archetype.label} enemy. Score +${scoreValue}.`);
+  }
+
+  function resolveSpellHit(enemy, spellName, now) {
+    const archetype = getEnemyArchetype(enemy.type);
+    const impactColor = getSpellImpactColor(spellName);
+    const impactX = enemy.x;
+    const impactY = getEnemyY(enemy, now);
+
+    enemy.hitFlash = 1;
+    enemy.hitFlashMs = MATCH_SETTINGS.wrongSpellFlashMs;
+    enemy.hitFlashColor = impactColor;
+
+    if (spellName === archetype.spell) {
+      enemy.hp = 0;
+      state.rings.push(
+        createRingEffect({
+          x: impactX,
+          y: impactY,
+          color: impactColor,
+          maxRadius: enemy.radius * 2.3,
+          lifeMs: 360,
+          lineWidth: 3,
+        }),
+      );
+      state.particles.push(
+        ...createBurstParticles({
+          x: impactX,
+          y: impactY,
+          color: impactColor,
+          count: 22,
+          minSpeed: 60,
+          maxSpeed: 220,
+          lifeMs: 420,
+        }),
+      );
+      return { matched: true, defeated: true };
+    }
+
+    enemy.x = Math.min(enemy.x + MATCH_SETTINGS.wrongSpellPushbackPx, viewportWidth - enemy.radius * 0.7);
+    state.rings.push(
+      createRingEffect({
+        x: impactX,
+        y: impactY,
+        color: impactColor,
+        maxRadius: enemy.radius * 1.55,
+        lifeMs: 250,
+        lineWidth: 2,
+      }),
+    );
+    state.particles.push(
+      ...createBurstParticles({
+        x: impactX,
+        y: impactY,
+        color: impactColor,
+        count: MATCH_SETTINGS.wrongSpellParticleCount,
+        minSpeed: 32,
+        maxSpeed: 110,
+        lifeMs: 260,
+      }),
+      ...createBurstParticles({
+        x: impactX,
+        y: impactY,
+        color: archetype.rgb,
+        count: 6,
+        minSpeed: 16,
+        maxSpeed: 64,
+        minRadius: 1,
+        maxRadius: 3,
+        lifeMs: 240,
+      }),
+    );
+    pushBattleEvent('Wrong spell', `${spellName} does not break the ${archetype.label} enemy.`);
+    return { matched: false, defeated: false };
   }
 
   function updateEnemies(deltaSeconds, now) {
@@ -263,7 +365,6 @@ export function createGame({
       enemy.spawnFlashMs = Math.max(0, enemy.spawnFlashMs - deltaSeconds * 1000);
 
       if (enemy.hp <= 0) {
-        defeatEnemy(enemy, now);
         state.enemies.splice(index, 1);
         continue;
       }
@@ -326,21 +427,9 @@ export function createGame({
         continue;
       }
 
-      hitEnemy.hp -= projectile.damage;
-      hitEnemy.hitFlash = 1;
-      hitEnemy.hitFlashMs = 180;
-      const impactRingColor = projectile.spellName === 'Freeze' ? '191 219 254' : '251 146 60';
-      const impactBurstColor = projectile.spellName === 'Freeze' ? '224 242 254' : '251 146 60';
-      state.rings.push(
-        createRingEffect({
-          x: hitEnemy.x,
-          y: getEnemyY(hitEnemy, now),
-          color: impactRingColor,
-          maxRadius: hitEnemy.radius * 1.8,
-          lifeMs: projectile.spellName === 'Freeze' ? 340 : 260,
-          lineWidth: projectile.spellName === 'Freeze' ? 3 : 2,
-        }),
-      );
+      const spellName = projectile.spellName ?? 'Fireball';
+      const result = resolveSpellHit(hitEnemy, spellName, now);
+
       if (projectile.spellName === 'Freeze') {
         state.rings.push(
           createRingEffect({
@@ -348,25 +437,14 @@ export function createGame({
             y: getEnemyY(hitEnemy, now),
             color: '103 232 249',
             maxRadius: hitEnemy.radius * 2.2,
-            lifeMs: 420,
+            lifeMs: result.matched ? 420 : 260,
             lineWidth: 2,
           }),
         );
       }
-      state.particles.push(
-        ...createBurstParticles({
-          x: hitEnemy.x,
-          y: getEnemyY(hitEnemy, now),
-          color: impactBurstColor,
-          count: projectile.spellName === 'Freeze' ? 22 : 18,
-          minSpeed: 50,
-          maxSpeed: projectile.spellName === 'Freeze' ? 160 : 180,
-          lifeMs: projectile.spellName === 'Freeze' ? 460 : 380,
-        }),
-      );
 
-      if (hitEnemy.hp <= 0) {
-        defeatEnemy(hitEnemy, now, projectile.spellName ?? 'Fireball');
+      if (result.defeated) {
+        defeatEnemy(hitEnemy, now, spellName);
         state.enemies = state.enemies.filter((enemy) => enemy.id !== hitEnemy.id);
       }
 
@@ -569,7 +647,8 @@ export function createGame({
   }
 
   function renderEnemy(enemy, now) {
-    const y = getEnemyY(enemy, now);
+      const y = getEnemyY(enemy, now);
+    const archetype = getEnemyArchetype(enemy.type);
 
     context.fillStyle = 'rgba(0, 0, 0, 0.26)';
     context.beginPath();
@@ -577,30 +656,80 @@ export function createGame({
     context.fill();
 
     const glow = context.createRadialGradient(enemy.x, y, 0, enemy.x, y, enemy.radius * 2.2);
-    glow.addColorStop(0, rgbaFromRgbString('248 113 113', 0.42));
-    glow.addColorStop(1, rgbaFromRgbString('248 113 113', 0));
+    glow.addColorStop(0, rgbaFromRgbString(archetype.rgb, 0.42));
+    glow.addColorStop(1, rgbaFromRgbString(archetype.rgb, 0));
     context.fillStyle = glow;
     context.beginPath();
     context.arc(enemy.x, y, enemy.radius * 2.2, 0, Math.PI * 2);
     context.fill();
 
-    context.fillStyle = enemy.spawnFlashMs > 0 ? rgbaFromRgbString('251 191 36', 0.34) : '#1f2937';
-    context.beginPath();
-    context.moveTo(enemy.x, y - enemy.radius);
-    context.lineTo(enemy.x + enemy.radius * 0.9, y);
-    context.lineTo(enemy.x, y + enemy.radius);
-    context.lineTo(enemy.x - enemy.radius * 0.9, y);
-    context.closePath();
-    context.fill();
+    context.fillStyle = enemy.spawnFlashMs > 0
+      ? rgbaFromRgbString(archetype.rgb, 0.34)
+      : rgbaFromRgbString(archetype.outline, 0.96);
+
+    if (enemy.type === 'EMBER') {
+      context.beginPath();
+      context.moveTo(enemy.x, y - enemy.radius * 1.05);
+      context.lineTo(enemy.x + enemy.radius * 0.95, y);
+      context.lineTo(enemy.x, y + enemy.radius);
+      context.lineTo(enemy.x - enemy.radius * 0.95, y);
+      context.closePath();
+      context.fill();
+
+      context.fillStyle = rgbaFromRgbString(archetype.rgb, 0.86);
+      context.beginPath();
+      context.moveTo(enemy.x, y - enemy.radius * 1.28);
+      context.lineTo(enemy.x + enemy.radius * 0.24, y - enemy.radius * 0.54);
+      context.lineTo(enemy.x - enemy.radius * 0.16, y - enemy.radius * 0.52);
+      context.closePath();
+      context.fill();
+    } else if (enemy.type === 'STORM') {
+      context.beginPath();
+      context.moveTo(enemy.x, y - enemy.radius);
+      context.lineTo(enemy.x + enemy.radius * 0.72, y - enemy.radius * 0.36);
+      context.lineTo(enemy.x + enemy.radius * 0.96, y + enemy.radius * 0.24);
+      context.lineTo(enemy.x, y + enemy.radius);
+      context.lineTo(enemy.x - enemy.radius * 0.96, y + enemy.radius * 0.24);
+      context.lineTo(enemy.x - enemy.radius * 0.72, y - enemy.radius * 0.36);
+      context.closePath();
+      context.fill();
+
+      context.strokeStyle = rgbaFromRgbString(archetype.rgb, 0.92);
+      context.lineWidth = 3;
+      context.beginPath();
+      context.moveTo(enemy.x + 2, y - enemy.radius * 0.58);
+      context.lineTo(enemy.x - 6, y - 2);
+      context.lineTo(enemy.x + 4, y - 2);
+      context.lineTo(enemy.x - 3, y + enemy.radius * 0.52);
+      context.stroke();
+    } else {
+      context.beginPath();
+      context.moveTo(enemy.x, y - enemy.radius * 1.04);
+      context.lineTo(enemy.x + enemy.radius * 0.76, y - enemy.radius * 0.34);
+      context.lineTo(enemy.x + enemy.radius * 0.74, y + enemy.radius * 0.46);
+      context.lineTo(enemy.x, y + enemy.radius);
+      context.lineTo(enemy.x - enemy.radius * 0.74, y + enemy.radius * 0.46);
+      context.lineTo(enemy.x - enemy.radius * 0.76, y - enemy.radius * 0.34);
+      context.closePath();
+      context.fill();
+
+      context.strokeStyle = rgbaFromRgbString('224 242 254', 0.82);
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(enemy.x - enemy.radius * 0.44, y + enemy.radius * 0.66);
+      context.lineTo(enemy.x - enemy.radius * 0.12, y + enemy.radius * 1.1);
+      context.lineTo(enemy.x + enemy.radius * 0.18, y + enemy.radius * 0.64);
+      context.stroke();
+    }
 
     context.fillStyle = enemy.hitFlash > 0
-      ? rgbaFromRgbString('255 255 255', 0.66 * enemy.hitFlash)
-      : '#f87171';
+      ? rgbaFromRgbString(enemy.hitFlashColor ?? '255 255 255', 0.72 * enemy.hitFlash)
+      : archetype.core;
     context.beginPath();
-    context.arc(enemy.x, y, enemy.radius * 0.52, 0, Math.PI * 2);
+    context.arc(enemy.x, y, enemy.radius * 0.48, 0, Math.PI * 2);
     context.fill();
 
-    context.fillStyle = '#fff7ed';
+    context.fillStyle = archetype.core;
     context.beginPath();
     context.arc(enemy.x + enemy.radius * 0.12, y - 2, 4, 0, Math.PI * 2);
     context.fill();
@@ -768,14 +897,19 @@ export function createGame({
 
     if (result.accepted) {
       pushBattleEvent(result.headline, result.detail);
-      state.enemies = state.enemies.filter((enemy) => {
-        if (enemy.hp > 0) {
-          return true;
-        }
 
-        defeatEnemy(enemy, now, spellName);
-        return false;
-      });
+      if (result.instantTargetId) {
+        const targetEnemy = state.enemies.find((enemy) => enemy.id === result.instantTargetId);
+
+        if (targetEnemy) {
+          const hitResult = resolveSpellHit(targetEnemy, spellName, now);
+
+          if (hitResult.defeated) {
+            defeatEnemy(targetEnemy, now, spellName);
+            state.enemies = state.enemies.filter((enemy) => enemy.id !== targetEnemy.id);
+          }
+        }
+      }
     }
 
     onStateChange(getSnapshot(now));
@@ -786,8 +920,8 @@ export function createGame({
     const freshState = createInitialState();
     Object.assign(state, freshState);
     scheduleNextSpawn();
-    state.feedText = 'Battle reset. Raise one hand and defend the lane again.';
-    onBattleEvent('Battle reset. The mage returns to the left-side ward.');
+    state.feedText = 'Battle reset. Match Fireball to Ember, Lightning to Storm, and Freeze to Frost.';
+    onBattleEvent('Battle reset. Match the enemy type and defend the lane.');
     onStateChange(getSnapshot(performance.now()));
   }
 

@@ -781,7 +781,7 @@ function restartBattle() {
   }
 
   game.restart();
-  ui.setDebugMessage('Battle reset. Raise one hand and defend the lane again.');
+  ui.setDebugMessage('Battle reset. Match each enemy to the correct spell and defend the lane.');
 }
 
 function bindGlobalListeners() {

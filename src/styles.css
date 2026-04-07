@@ -184,10 +184,22 @@ body {
   align-self: start;
 }
 
+.battle-panel {
+  min-width: 0;
+}
+
+.top-stage-grid {
+  align-items: start;
+}
+
+.lens-panel {
+  min-width: 0;
+}
+
 .arena-viewport {
   aspect-ratio: 16 / 9;
-  min-height: 24rem;
-  max-height: min(42rem, 70vh);
+  min-height: 28rem;
+  max-height: min(52rem, 78vh);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 28px 70px rgba(0, 0, 0, 0.36);
@@ -207,6 +219,14 @@ body {
 
 .arena-canvas {
   display: block;
+}
+
+.battle-stage-shell {
+  position: relative;
+}
+
+.battle-stage {
+  max-width: none;
 }
 
 .arena-stat {
@@ -234,11 +254,16 @@ body {
 }
 
 .arena-feed {
+  width: min(100%, 28rem);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(7, 15, 28, 0.7);
   padding: 1rem 1rem 0.95rem;
   backdrop-filter: blur(16px);
+}
+
+.arena-stage-meta {
+  width: min(100% - 2rem, 28rem);
 }
 
 .arena-overlay {
@@ -270,21 +295,29 @@ body {
 }
 
 .stage-viewport {
-  aspect-ratio: 16 / 10;
-  min-height: 20rem;
-  max-height: min(34rem, 62vh);
+  aspect-ratio: 4 / 3;
+  min-height: 14rem;
+  max-height: 20rem;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 26px 60px rgba(0, 0, 0, 0.34);
+    0 18px 44px rgba(0, 0, 0, 0.28);
 }
 
 .lens-viewport {
-  min-height: 16rem;
-  max-height: min(22rem, 42vh);
+  min-height: 14rem;
+  max-height: none;
 }
 
 .mirrored {
   transform: scaleX(-1);
+}
+
+.lens-toolbar {
+  align-items: center;
+}
+
+.lens-panel__meta {
+  position: relative;
 }
 
 .glass-pill {
@@ -301,6 +334,13 @@ body {
   text-transform: uppercase;
   color: #d8e3f6;
   backdrop-filter: blur(18px);
+}
+
+.glass-pill--compact {
+  gap: 0.42rem;
+  padding: 0.42rem 0.7rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
 }
 
 .spell-readout {
@@ -455,8 +495,7 @@ body {
 }
 
 .stage-notice.is-hidden {
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
 .stage-notice--neutral {
@@ -473,16 +512,44 @@ body {
 
 @media (min-width: 1024px) {
   .arena-viewport {
-    min-height: 31rem;
+    min-height: 36rem;
   }
 
   .stage-viewport {
-    aspect-ratio: 16 / 9;
+    min-height: 15rem;
+    max-height: 21rem;
   }
 
   .lens-viewport {
-    min-height: 17rem;
-    max-height: min(24rem, 44vh);
+    min-height: 15rem;
+  }
+
+  .arena-stage-meta {
+    width: min(32rem, 34vw);
+  }
+}
+
+@media (max-width: 767px) {
+  .arena-viewport {
+    min-height: 22rem;
+  }
+
+  .arena-stage-meta {
+    width: min(100% - 1.5rem, 22rem);
+  }
+
+  .arena-feed {
+    width: 100%;
+  }
+
+  .stage-viewport,
+  .lens-viewport {
+    min-height: 12rem;
+    max-height: 15rem;
+  }
+
+  .status-row__value {
+    max-width: 11rem;
   }
 }
 

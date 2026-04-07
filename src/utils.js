@@ -6,6 +6,42 @@ export const SPELL_THEME = {
   Heal: { accent: '#34d399', rgb: '52 211 153' },
 };
 
+export const ENEMY_ARCHETYPES = {
+  EMBER: {
+    key: 'EMBER',
+    label: 'Ember',
+    spell: 'Fireball',
+    rgb: '251 146 60',
+    accent: '#fb923c',
+    core: '#fff7ed',
+    outline: '194 65 12',
+  },
+  STORM: {
+    key: 'STORM',
+    label: 'Storm',
+    spell: 'Lightning',
+    rgb: '250 204 21',
+    accent: '#facc15',
+    core: '#fff8c2',
+    outline: '202 138 4',
+  },
+  FROST: {
+    key: 'FROST',
+    label: 'Frost',
+    spell: 'Freeze',
+    rgb: '191 219 254',
+    accent: '#bfdbfe',
+    core: '#eff6ff',
+    outline: '56 189 248',
+  },
+};
+
+export const ENEMY_ARCHETYPE_KEYS = Object.keys(ENEMY_ARCHETYPES);
+
+export function getEnemyArchetype(enemyType) {
+  return ENEMY_ARCHETYPES[enemyType] ?? ENEMY_ARCHETYPES.EMBER;
+}
+
 export const HAND_CONNECTIONS = [
   [0, 1], [1, 2], [2, 3], [3, 4],
   [0, 5], [5, 6], [6, 7], [7, 8],

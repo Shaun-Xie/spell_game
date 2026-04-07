@@ -43,12 +43,12 @@ const ACTIVE_PRESENTATION = {
   candidateLabel: 'Raw Gesture',
   spellbookDescription: 'Single-hand spellcasting is currently active.',
   spellbookBody:
-    'Defend the left-side ward with one hand. Hold a mapped pose long enough for it to stabilize, then the battle lane responds to the confirmed spell.',
+    'Match Fireball to Ember, Lightning to Storm, and Freeze to Frost. Heal restores HP and keeps the mage alive between threats.',
   spellbook: {
-    fireball: { title: 'Fireball', hint: 'Closed fist' },
-    freeze: { title: 'Freeze', hint: 'Thumbs up' },
-    lightning: { title: 'Lightning', hint: 'Index finger only' },
-    heal: { title: 'Heal', hint: 'Index + middle' },
+    fireball: { title: 'Fireball', hint: 'Closed fist · Ember' },
+    freeze: { title: 'Freeze', hint: 'Thumbs up · Frost' },
+    lightning: { title: 'Lightning', hint: 'Index finger only · Storm' },
+    heal: { title: 'Heal', hint: 'Index + middle · Restore HP' },
   },
 };
 

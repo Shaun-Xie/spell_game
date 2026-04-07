@@ -130,6 +130,7 @@ function castFireball(state, now, width) {
 
   state.projectiles.push({
     id: state.nextProjectileId++,
+    spellName: 'Fireball',
     x: origin.x,
     y: origin.y,
     vx: (dx / distance) * Fireball.projectileSpeed,
@@ -181,27 +182,11 @@ function castLightning(state, now, width) {
     }),
   );
 
-  if (target) {
-    target.hp -= Lightning.damage;
-    target.hitFlash = 1;
-    target.hitFlashMs = 180;
-    state.particles.push(
-      ...createBurstParticles({
-        x: target.x,
-        y: target.y,
-        color: '250 204 21',
-        count: 16,
-        minSpeed: 80,
-        maxSpeed: 210,
-        lifeMs: 360,
-      }),
-    );
-  }
-
   return {
     accepted: true,
     headline: 'Lightning cast',
     detail: target ? 'The nearest foe is struck instantly.' : 'A crackling arc tears across the lane.',
+    instantTargetId: target?.id ?? null,
   };
 }
 
