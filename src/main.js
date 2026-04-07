@@ -1,23 +1,38 @@
 import './styles.css';
 import { describeCameraSettings, startCamera, stopCamera } from './camera.js';
-import { GESTURE_MODE, GESTURE_MODES, createGestureController } from './gestureClassifier.js';
+import { createGestureController } from './gestureClassifier.js';
+import { createGame } from './game.js';
 import { createHandTracker } from './handTracker.js';
 import { createUI } from './ui.js';
 
 const ui = createUI();
 const handTracker = createHandTracker();
-const gestureController = createGestureController({ mode: GESTURE_MODE });
+const gestureController = createGestureController();
+const game = createGame({
+  canvas: ui.refs.gameCanvas,
+  onStateChange: (state) => {
+    ui.renderGameState(state);
+  },
+  onBattleEvent: (message) => {
+    ui.setDebugMessage(message);
+    ui.pushDebugMessage(message);
+  },
+});
 
-ui.setGestureMode(gestureController.mode);
+ui.setGestureMode();
 
 let cameraSession = null;
 let animationFrameId = null;
 let modelReady = false;
 let cameraReady = false;
-let lastCandidateKey = 'NO_INPUT';
+let lastRawGesture = 'NO_INPUT';
 let handPreviouslyVisible = false;
 
 function describeCameraError(error) {
+  if (error?.name === 'InsecureContextError') {
+    return 'Webcam access needs localhost or HTTPS. Use npm run dev, npm run preview, or a secure deployed host.';
+  }
+
   if (error?.name === 'NotAllowedError') {
     return 'Camera permission was denied. Allow webcam access and try again.';
   }
@@ -26,10 +41,26 @@ function describeCameraError(error) {
     return 'No webcam was found on this device.';
   }
 
+  if (error?.name === 'NotReadableError') {
+    return 'The webcam is already in use by another app or browser tab.';
+  }
+
+  if (error?.name === 'CameraStartupTimeout') {
+    return 'The webcam stream took too long to start. Retry setup and make sure the browser finishes the permission prompt.';
+  }
+
+  if (error?.name === 'GetUserMediaUnavailable') {
+    return 'This browser cannot access getUserMedia. Use a current browser over localhost or HTTPS.';
+  }
+
   return 'The webcam could not be started. Check browser permissions and camera availability.';
 }
 
-function describeModelError() {
+function describeModelError(error) {
+  if (error?.name === 'MediaPipeWasmTimeout' || error?.name === 'HandLandmarkerInitTimeout') {
+    return 'The hand tracker took too long to start. Refresh, then retry on a normal network connection.';
+  }
+
   return 'The MediaPipe Hand Landmarker failed to load. Check your network connection and refresh.';
 }
 
@@ -41,36 +72,13 @@ function stopRenderLoop() {
 }
 
 function getTrackingIdleCopy() {
-  if (gestureController.mode === GESTURE_MODES.TWO_HAND) {
-    return {
-      title: 'Raise both hands into view',
-      hint: 'Hold a mapped two-hand pose steady for a few frames to confirm a spell.',
-    };
-  }
-
   return {
     title: 'Raise one hand into view',
-    hint: 'Hold a mapped pose steady for a few frames to confirm a spell.',
+    hint: 'Hold a mapped one-hand pose steady for a few frames to cast into the battle lane.',
   };
 }
 
 function getTrackingMessage(state) {
-  if (state.mode === GESTURE_MODES.TWO_HAND) {
-    if (state.handCount === 0) {
-      return 'Tracking is active, but no hands are currently visible.';
-    }
-
-    if (state.handCount === 1) {
-      return 'One hand detected. A second hand is required for two-hand spell casting.';
-    }
-
-    if (!state.combinedCandidateKey || state.combinedCandidateKey === 'AMBIGUOUS_PAIR') {
-      return 'Two hands detected, but the pair pose does not match a mapped spell yet.';
-    }
-
-    return `Detected pair candidate: ${state.combinedCandidateLabel}.`;
-  }
-
   if (state.rawGesture === 'UNKNOWN') {
     return 'Hand detected, but the pose does not match one of the mapped spells yet.';
   }
@@ -83,29 +91,7 @@ function getTrackingMessage(state) {
 }
 
 function updateStageNoticeForState(state) {
-  if (state.mode === GESTURE_MODES.TWO_HAND) {
-    if (state.handCount === 0) {
-      ui.setStageNotice({
-        title: 'Two hands needed',
-        hint: 'Lift both hands into the webcam frame to begin pair casting.',
-        tone: 'neutral',
-        hidden: false,
-        showRetry: false,
-      });
-      return;
-    }
-
-    if (state.handCount === 1) {
-      ui.setStageNotice({
-        title: 'Second hand needed',
-        hint: 'Pair spells only trigger when both hands are visible and held intentionally.',
-        tone: 'neutral',
-        hidden: false,
-        showRetry: false,
-      });
-      return;
-    }
-  } else if (state.handCount === 0) {
+  if (!state.handVisible) {
     ui.setStageNotice({
       title: 'No hand detected',
       hint: 'Raise one hand inside the webcam frame to begin casting.',
@@ -118,15 +104,11 @@ function updateStageNoticeForState(state) {
 
   ui.setStageNotice({
     title: 'Hand tracking locked',
-    hint: 'Landmarks are updating in real time. Hold a mapped pose to confirm a spell.',
+    hint: 'Landmarks are updating in real time. Hold a mapped pose to cast into the battle lane.',
     tone: 'neutral',
     hidden: true,
     showRetry: false,
   });
-}
-
-function describeTrackedHands(count) {
-  return `${count} ${count === 1 ? 'hand' : 'hands'} visible`;
 }
 
 function maybeStartLoop() {
@@ -135,7 +117,6 @@ function maybeStartLoop() {
   }
 
   const idleCopy = getTrackingIdleCopy();
-
   ui.setStageNotice({
     title: idleCopy.title,
     hint: idleCopy.hint,
@@ -143,6 +124,8 @@ function maybeStartLoop() {
     hidden: false,
     showRetry: false,
   });
+
+  game.start();
 
   const renderLoop = (timestamp) => {
     animationFrameId = requestAnimationFrame(renderLoop);
@@ -153,9 +136,9 @@ function maybeStartLoop() {
       return;
     }
 
-    const detections = handTracker.getDetections(result);
+    const detection = handTracker.getPrimaryDetection(result);
 
-    if (!detections.length) {
+    if (!detection) {
       const noHandState = gestureController.observeNoHand(timestamp);
       ui.clearOverlay();
       ui.setHandStatus('idle', 'No hand detected');
@@ -168,29 +151,29 @@ function maybeStartLoop() {
         handPreviouslyVisible = false;
       }
 
-      lastCandidateKey = noHandState.combinedCandidateKey ?? 'NO_INPUT';
+      lastRawGesture = noHandState.rawGesture;
       return;
     }
 
-    const gestureState = gestureController.evaluateDetections(detections, timestamp);
+    const gestureState = gestureController.evaluateDetection(detection, timestamp);
     handPreviouslyVisible = true;
-    ui.setHandStatus('active', describeTrackedHands(gestureState.handCount));
+    ui.setHandStatus('active', 'Hand tracked');
     updateStageNoticeForState(gestureState);
-
     ui.renderGestureState(gestureState);
-    ui.drawHandOverlay(detections, gestureState.stableSpell ?? gestureState.confirmedSpell);
+    ui.drawHandOverlay(detection, gestureState.stableSpell ?? gestureState.confirmedSpell);
 
-    if ((gestureState.combinedCandidateKey ?? gestureState.rawGesture) !== lastCandidateKey) {
+    if (gestureState.rawGesture !== lastRawGesture) {
       ui.setDebugMessage(getTrackingMessage(gestureState));
-      lastCandidateKey = gestureState.combinedCandidateKey ?? gestureState.rawGesture;
+      lastRawGesture = gestureState.rawGesture;
     }
 
     if (gestureState.confirmedSpell) {
-      ui.setDebugMessage(`${gestureState.confirmedSpell} confirmed and cooldown started.`);
-      ui.pushDebugMessage(
-        `${gestureState.confirmedSpell} confirmed from ${gestureState.combinedCandidateLabel.toLowerCase()}.`,
-      );
       ui.playSpellConfirm(gestureState.confirmedSpell);
+      const castResult = game.castSpell(gestureState.confirmedSpell, timestamp);
+
+      if (!castResult.accepted) {
+        ui.setDebugMessage(`${castResult.headline}. ${castResult.detail}`);
+      }
     }
   };
 
@@ -214,11 +197,11 @@ async function initializeModel() {
   } catch (error) {
     modelReady = false;
     ui.setModelStatus('error', 'Model error');
-    ui.setDebugMessage(describeModelError());
-    ui.pushDebugMessage(describeModelError());
+    ui.setDebugMessage(describeModelError(error));
+    ui.pushDebugMessage(describeModelError(error));
     ui.setStageNotice({
       title: 'Tracking model unavailable',
-      hint: describeModelError(),
+      hint: describeModelError(error),
       tone: 'error',
       hidden: false,
       showRetry: true,
@@ -263,6 +246,7 @@ async function boot() {
   ui.setModelStatus('loading', 'Loading');
   ui.setHandStatus('idle', 'Stand by');
   ui.renderGestureState(gestureController.observeNoHand());
+  ui.renderGameState(game.getState());
 
   await Promise.allSettled([initializeModel(), initializeCamera()]);
   maybeStartLoop();
@@ -270,7 +254,7 @@ async function boot() {
 
 async function retrySetup() {
   stopRenderLoop();
-  lastCandidateKey = 'NO_INPUT';
+  lastRawGesture = 'NO_INPUT';
   handPreviouslyVisible = false;
 
   if (!modelReady) {
@@ -284,16 +268,32 @@ async function retrySetup() {
   maybeStartLoop();
 }
 
+function restartBattle() {
+  game.restart();
+  ui.setDebugMessage('Battle reset. Raise one hand and defend the lane again.');
+}
+
 ui.bindRetry(() => {
   retrySetup().catch((error) => {
     console.error('[Mage Hands] Retry failed.', error);
   });
 });
 
+ui.bindGameRestart(() => {
+  restartBattle();
+});
+
+window.addEventListener('keydown', (event) => {
+  if ((event.key === 'r' || event.key === 'R' || event.key === 'Enter') && game.getState().gameOver) {
+    restartBattle();
+  }
+});
+
 window.addEventListener('beforeunload', () => {
   stopRenderLoop();
   stopCamera(ui.refs.video);
   handTracker.dispose();
+  game.dispose();
 });
 
 boot().catch((error) => {

@@ -18,7 +18,7 @@ import {
 } from 'lucide';
 import { animate, stagger } from 'motion';
 import { Howl } from 'howler';
-import { GESTURE_MODES } from './gestureClassifier.js';
+import { GESTURE_MODE_LABEL } from './gestureClassifier.js';
 import { HAND_CONNECTIONS, SPELL_THEME, createToneDataUri, formatDuration, timeStampLabel } from './utils.js';
 
 const STATUS_BADGE_CLASS_MAP = {
@@ -30,40 +30,24 @@ const STATUS_BADGE_CLASS_MAP = {
   cooldown: 'status-badge status-badge--cooldown',
 };
 
+const ACTIVE_PRESENTATION = {
+  label: GESTURE_MODE_LABEL,
+  pill: 'Legacy One-Hand',
+  candidateLabel: 'Raw Gesture',
+  spellbookDescription: 'Single-hand spellcasting is currently active.',
+  spellbookBody:
+    'Defend the left-side ward with one hand. Hold a mapped pose long enough for it to stabilize, then the battle lane responds to the confirmed spell.',
+  spellbook: {
+    fireball: { title: 'Fireball', hint: 'Closed fist' },
+    block: { title: 'Block', hint: 'Thumbs up' },
+    lightning: { title: 'Lightning', hint: 'Index finger only' },
+    heal: { title: 'Heal', hint: 'Index + middle' },
+  },
+};
+
 function getSpellTheme(spellName) {
   return SPELL_THEME[spellName] ?? SPELL_THEME.Neutral;
 }
-
-const MODE_PRESENTATION = {
-  [GESTURE_MODES.TWO_HAND]: {
-    label: 'Two-hand arcana',
-    pill: 'Two-Hand Mode',
-    candidateLabel: 'Combined Candidate',
-    spellbookDescription: 'Mapped hand poses for the current recognition mode.',
-    spellbookBody:
-      'Bring both hands into frame, hold the pair pose deliberately, and pause for a few frames so the combined spell can stabilize.',
-    spellbook: {
-      fireball: { title: 'Fireball', hint: 'Fist into other hand' },
-      block: { title: 'Block', hint: 'Two open hands' },
-      lightning: { title: 'Lightning', hint: 'Three fingers on both hands' },
-      heal: { title: 'Heal', hint: 'Prayer pose' },
-    },
-  },
-  [GESTURE_MODES.LEGACY_ONE_HAND]: {
-    label: 'Legacy one-hand',
-    pill: 'Legacy One-Hand',
-    candidateLabel: 'Raw Gesture',
-    spellbookDescription: 'Original single-hand mappings are currently active.',
-    spellbookBody:
-      'Use a single visible hand and hold one of the mapped poses steady for a few frames to confirm a cast.',
-    spellbook: {
-      fireball: { title: 'Fireball', hint: 'Closed fist' },
-      block: { title: 'Block', hint: 'Thumbs up' },
-      lightning: { title: 'Lightning', hint: 'Index finger only' },
-      heal: { title: 'Heal', hint: 'Index + middle' },
-    },
-  },
-};
 
 function animateBadge(element) {
   animate(
@@ -71,6 +55,16 @@ function animateBadge(element) {
     { opacity: [0.82, 1], scale: [0.98, 1] },
     { duration: 0.24, easing: 'ease-out' },
   );
+}
+
+function formatWardStatus(shieldRemainingMs) {
+  return shieldRemainingMs > 0
+    ? `Ward active · ${formatDuration(shieldRemainingMs)}`
+    : 'Ward offline';
+}
+
+function formatHealth(playerHp, playerMaxHp) {
+  return `${Math.max(0, Math.round(playerHp))} / ${playerMaxHp}`;
 }
 
 export function createUI() {
@@ -96,6 +90,17 @@ export function createUI() {
 
   const refs = {
     appShell: document.getElementById('appShell'),
+    gameCanvas: document.getElementById('gameCanvas'),
+    gameStateBadge: document.getElementById('gameStateBadge'),
+    arenaHpValue: document.getElementById('arenaHpValue'),
+    arenaScoreValue: document.getElementById('arenaScoreValue'),
+    arenaEnemiesValue: document.getElementById('arenaEnemiesValue'),
+    arenaWardValue: document.getElementById('arenaWardValue'),
+    arenaFeedText: document.getElementById('arenaFeedText'),
+    gameOverOverlay: document.getElementById('gameOverOverlay'),
+    gameOverTitle: document.getElementById('gameOverTitle'),
+    gameOverText: document.getElementById('gameOverText'),
+    gameRestartButton: document.getElementById('gameRestartButton'),
     video: document.getElementById('webcam'),
     overlay: document.getElementById('landmarkOverlay'),
     stageViewport: document.getElementById('stageViewport'),
@@ -112,13 +117,17 @@ export function createUI() {
     modelStatusText: document.getElementById('modelStatusText'),
     handStatusText: document.getElementById('handStatusText'),
     gestureModeText: document.getElementById('gestureModeText'),
-    handCountText: document.getElementById('handCountText'),
-    leftHandStateText: document.getElementById('leftHandStateText'),
-    rightHandStateText: document.getElementById('rightHandStateText'),
+    handPoseText: document.getElementById('handPoseText'),
     rawGestureLabel: document.getElementById('rawGestureLabel'),
     rawGestureText: document.getElementById('rawGestureText'),
     stableSpellText: document.getElementById('stableSpellText'),
     cooldownText: document.getElementById('cooldownText'),
+    playerHpText: document.getElementById('playerHpText'),
+    wardStatusText: document.getElementById('wardStatusText'),
+    enemiesText: document.getElementById('enemiesText'),
+    scoreText: document.getElementById('scoreText'),
+    defeatedText: document.getElementById('defeatedText'),
+    gameStateText: document.getElementById('gameStateText'),
     debugMessageText: document.getElementById('debugMessageText'),
     stageSpellName: document.getElementById('stageSpellName'),
     stageSpellDetail: document.getElementById('stageSpellDetail'),
@@ -159,8 +168,8 @@ export function createUI() {
     let offsetX = 0;
     let offsetY = 0;
 
-    // The video uses object-contain, so landmarks must be drawn inside the
-    // displayed video rectangle rather than stretched across the whole stage.
+    // The video uses object-contain, so the overlay must be drawn inside the
+    // displayed video rectangle rather than stretched across the full panel.
     if (viewportAspectRatio > videoAspectRatio) {
       contentHeight = viewportHeight;
       contentWidth = contentHeight * videoAspectRatio;
@@ -204,33 +213,31 @@ export function createUI() {
     },
   );
 
-  function setGestureMode(mode) {
-    const presentation = MODE_PRESENTATION[mode] ?? MODE_PRESENTATION[GESTURE_MODES.TWO_HAND];
-
-    refs.trackingModePill.textContent = presentation.pill;
-    refs.gestureModeText.textContent = presentation.label;
-    refs.rawGestureLabel.textContent = presentation.candidateLabel;
-    refs.stageRawGestureLabel.textContent = presentation.candidateLabel;
-    refs.spellbookModeDescription.textContent = presentation.spellbookDescription;
-    refs.spellbookBodyText.textContent = presentation.spellbookBody;
-    refs.spellCardFireballTitle.textContent = presentation.spellbook.fireball.title;
-    refs.spellCardFireballHint.textContent = presentation.spellbook.fireball.hint;
-    refs.spellCardBlockTitle.textContent = presentation.spellbook.block.title;
-    refs.spellCardBlockHint.textContent = presentation.spellbook.block.hint;
-    refs.spellCardLightningTitle.textContent = presentation.spellbook.lightning.title;
-    refs.spellCardLightningHint.textContent = presentation.spellbook.lightning.hint;
-    refs.spellCardHealTitle.textContent = presentation.spellbook.heal.title;
-    refs.spellCardHealHint.textContent = presentation.spellbook.heal.hint;
-  }
-
-  function formatHandCount(count) {
-    return `${count} ${count === 1 ? 'hand' : 'hands'}`;
+  function setGestureMode() {
+    refs.trackingModePill.textContent = ACTIVE_PRESENTATION.pill;
+    refs.gestureModeText.textContent = ACTIVE_PRESENTATION.label;
+    refs.rawGestureLabel.textContent = ACTIVE_PRESENTATION.candidateLabel;
+    refs.stageRawGestureLabel.textContent = ACTIVE_PRESENTATION.candidateLabel;
+    refs.spellbookModeDescription.textContent = ACTIVE_PRESENTATION.spellbookDescription;
+    refs.spellbookBodyText.textContent = ACTIVE_PRESENTATION.spellbookBody;
+    refs.spellCardFireballTitle.textContent = ACTIVE_PRESENTATION.spellbook.fireball.title;
+    refs.spellCardFireballHint.textContent = ACTIVE_PRESENTATION.spellbook.fireball.hint;
+    refs.spellCardBlockTitle.textContent = ACTIVE_PRESENTATION.spellbook.block.title;
+    refs.spellCardBlockHint.textContent = ACTIVE_PRESENTATION.spellbook.block.hint;
+    refs.spellCardLightningTitle.textContent = ACTIVE_PRESENTATION.spellbook.lightning.title;
+    refs.spellCardLightningHint.textContent = ACTIVE_PRESENTATION.spellbook.lightning.hint;
+    refs.spellCardHealTitle.textContent = ACTIVE_PRESENTATION.spellbook.heal.title;
+    refs.spellCardHealHint.textContent = ACTIVE_PRESENTATION.spellbook.heal.hint;
   }
 
   function setStatusBadge(element, text, tone) {
     element.textContent = text;
     element.className = STATUS_BADGE_CLASS_MAP[tone] ?? STATUS_BADGE_CLASS_MAP.idle;
     animateBadge(element);
+  }
+
+  function setGameStateBadge(text, tone) {
+    setStatusBadge(refs.gameStateBadge, text, tone);
   }
 
   function setCameraStatus(tone, text) {
@@ -284,19 +291,19 @@ export function createUI() {
     refs.cameraRetryButton.addEventListener('click', handler);
   }
 
+  function bindGameRestart(handler) {
+    refs.gameRestartButton.addEventListener('click', handler);
+  }
+
   function clearOverlay() {
     const { viewportWidth, viewportHeight } = getStageMetrics();
     overlayContext.clearRect(0, 0, viewportWidth, viewportHeight);
   }
 
-  function drawHandOverlay(handDetections, spellName = 'Neutral') {
-    const hands = Array.isArray(handDetections)
-      ? handDetections
-      : handDetections
-        ? [{ landmarks: handDetections }]
-        : [];
+  function drawHandOverlay(handDetection, spellName = 'Neutral') {
+    const landmarks = handDetection?.landmarks ?? handDetection;
 
-    if (!hands.length) {
+    if (!landmarks) {
       clearOverlay();
       return;
     }
@@ -312,46 +319,40 @@ export function createUI() {
     const theme = getSpellTheme(spellName);
     const scale = Math.max(0.8, Math.min(contentWidth / 960, 1.05));
 
-    hands.forEach((hand, handIndex) => {
-      const landmarks = hand.landmarks ?? hand;
-      const opacity = hands.length > 1 ? (handIndex === 0 ? 0.82 : 0.64) : 0.78;
+    overlayContext.lineWidth = 2.05 * scale;
+    overlayContext.strokeStyle = `rgba(${theme.rgb}, 0.82)`;
+    overlayContext.fillStyle = `rgba(${theme.rgb}, 0.94)`;
+    overlayContext.shadowColor = `rgba(${theme.rgb}, 0.34)`;
+    overlayContext.shadowBlur = 15 * scale;
 
-      overlayContext.lineWidth = 2.05 * scale;
-      overlayContext.strokeStyle = `rgba(${theme.rgb}, ${opacity})`;
-      overlayContext.fillStyle = `rgba(${theme.rgb}, ${Math.min(opacity + 0.12, 0.96)})`;
-      overlayContext.shadowColor = `rgba(${theme.rgb}, 0.34)`;
-      overlayContext.shadowBlur = 15 * scale;
+    HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {
+      const start = landmarks[startIndex];
+      const end = landmarks[endIndex];
 
-      HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {
-        const start = landmarks[startIndex];
-        const end = landmarks[endIndex];
+      overlayContext.beginPath();
+      overlayContext.moveTo(offsetX + start.x * contentWidth, offsetY + start.y * contentHeight);
+      overlayContext.lineTo(offsetX + end.x * contentWidth, offsetY + end.y * contentHeight);
+      overlayContext.stroke();
+    });
 
-        overlayContext.beginPath();
-        overlayContext.moveTo(offsetX + start.x * contentWidth, offsetY + start.y * contentHeight);
-        overlayContext.lineTo(offsetX + end.x * contentWidth, offsetY + end.y * contentHeight);
-        overlayContext.stroke();
-      });
+    landmarks.forEach((landmark, index) => {
+      const radius = (index % 4 === 0 ? 4 : 3) * scale;
 
-      landmarks.forEach((landmark, index) => {
-        const radius = (index % 4 === 0 ? 4 : 3) * scale;
-
-        overlayContext.beginPath();
-        overlayContext.arc(
-          offsetX + landmark.x * contentWidth,
-          offsetY + landmark.y * contentHeight,
-          radius,
-          0,
-          Math.PI * 2,
-        );
-        overlayContext.fill();
-      });
+      overlayContext.beginPath();
+      overlayContext.arc(
+        offsetX + landmark.x * contentWidth,
+        offsetY + landmark.y * contentHeight,
+        radius,
+        0,
+        Math.PI * 2,
+      );
+      overlayContext.fill();
     });
   }
 
   function playSpellConfirm(spellName) {
     const playbackRate = {
       Fireball: 0.95,
-      Shield: 0.88,
       Block: 0.88,
       Lightning: 1.12,
       Heal: 0.78,
@@ -363,33 +364,27 @@ export function createUI() {
 
   function renderGestureState(state) {
     const stableSpell = state.stableSpell ?? 'No spell';
-    const candidateLabel = state.combinedCandidateLabel ?? state.rawGestureLabel;
     const cooldownLabel =
       state.cooldown.remainingMs > 0 && state.cooldown.spell
         ? `${state.cooldown.spell} recharging · ${formatDuration(state.cooldown.remainingMs)}`
         : 'Ready';
 
-    refs.gestureModeText.textContent = state.modeLabel ?? MODE_PRESENTATION[GESTURE_MODES.TWO_HAND].label;
-    refs.handCountText.textContent = formatHandCount(state.handCount ?? 0);
-    refs.leftHandStateText.textContent = state.leftHandStateLabel ?? 'No hand';
-    refs.rightHandStateText.textContent = state.rightHandStateLabel ?? 'No hand';
-    refs.rawGestureText.textContent = candidateLabel;
+    refs.gestureModeText.textContent = state.modeLabel ?? ACTIVE_PRESENTATION.label;
+    refs.handPoseText.textContent = state.handVisible ? state.handStateLabel : 'No hand';
+    refs.rawGestureText.textContent = state.rawGestureLabel;
     refs.stableSpellText.textContent = stableSpell;
     refs.cooldownText.textContent = cooldownLabel;
-    refs.stageRawGesture.textContent = candidateLabel;
+    refs.stageRawGesture.textContent = state.rawGestureLabel;
     refs.stageCooldown.textContent = cooldownLabel;
     refs.stageSpellName.textContent = stableSpell;
     refs.stageSpellDetail.textContent = state.stableSpell
-      ? `${state.framesHeld} steady frames locked. Hold or release to switch spells.`
-      : state.mode === GESTURE_MODES.TWO_HAND
-        ? state.handCount === 1
-          ? 'One hand is visible. Bring the second hand into frame for pair casting.'
-          : 'Hold a mapped two-hand pose for a few frames to stabilize recognition.'
-        : 'Hold a mapped one-hand pose for a few frames to stabilize recognition.';
+      ? `${state.framesHeld} steady frames locked. Release or switch poses to cast something else.`
+      : state.handVisible
+        ? 'Hold a mapped one-hand pose steady for a few frames to cast into the battle lane.'
+        : 'Raise one hand inside the webcam frame to begin casting.';
     refs.stageGestureBadge.querySelector('span').textContent = stableSpell;
 
-    const themeSpell = state.stableSpell ?? state.confirmedSpell ?? 'Neutral';
-    refs.appShell.dataset.spellTheme = themeSpell;
+    refs.appShell.dataset.spellTheme = state.stableSpell ?? state.confirmedSpell ?? 'Neutral';
 
     if (state.confirmedSpell) {
       refs.spellReadoutCard.classList.remove('spell-confirmed');
@@ -398,18 +393,49 @@ export function createUI() {
     }
   }
 
+  function renderGameState(state) {
+    refs.playerHpText.textContent = formatHealth(state.playerHp, state.playerMaxHp);
+    refs.wardStatusText.textContent = formatWardStatus(state.shieldRemainingMs);
+    refs.enemiesText.textContent = `${state.enemiesAlive}`;
+    refs.scoreText.textContent = `${state.score}`;
+    refs.defeatedText.textContent = `${state.defeatedEnemies}`;
+    refs.gameStateText.textContent = state.gameStateLabel;
+
+    refs.arenaHpValue.textContent = formatHealth(state.playerHp, state.playerMaxHp);
+    refs.arenaScoreValue.textContent = `${state.score}`;
+    refs.arenaEnemiesValue.textContent = `${state.enemiesAlive}`;
+    refs.arenaWardValue.textContent = state.shieldActive ? 'Active' : 'Offline';
+    refs.arenaFeedText.textContent = state.feedText;
+
+    if (state.gameOver) {
+      setGameStateBadge('Game Over', 'error');
+    } else if (state.shieldActive) {
+      setGameStateBadge('Ward Active', 'active');
+    } else {
+      setGameStateBadge('Battle Running', 'ready');
+    }
+
+    refs.gameOverOverlay.classList.toggle('is-hidden', !state.gameOver);
+    refs.gameOverTitle.textContent = state.gameOver ? 'The Ward Has Fallen' : 'Battle Paused';
+    refs.gameOverText.textContent = state.gameOver
+      ? `Final score ${state.score}. Enemies defeated: ${state.defeatedEnemies}.`
+      : '';
+  }
+
   return {
     refs,
+    bindGameRestart,
     bindRetry,
     clearOverlay,
     drawHandOverlay,
     playSpellConfirm,
     pushDebugMessage,
+    renderGameState,
     renderGestureState,
-    setGestureMode,
     setCameraMeta,
     setCameraStatus,
     setDebugMessage,
+    setGestureMode,
     setHandStatus,
     setModelStatus,
     setStageNotice,

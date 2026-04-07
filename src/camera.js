@@ -7,19 +7,71 @@ const DEFAULT_CAMERA_CONSTRAINTS = {
   },
 };
 
-function waitForMetadata(videoElement) {
-  if (videoElement.readyState >= HTMLMediaElement.HAVE_METADATA) {
+const CAMERA_START_TIMEOUT_MS = 12000;
+
+function createCameraError(name, message) {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
+function waitForVideoReady(videoElement, timeoutMs = CAMERA_START_TIMEOUT_MS) {
+  if (videoElement.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
     return Promise.resolve();
   }
 
-  return new Promise((resolve) => {
-    videoElement.onloadedmetadata = () => resolve();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      videoElement.removeEventListener('loadedmetadata', onReady);
+      videoElement.removeEventListener('loadeddata', onReady);
+      videoElement.removeEventListener('canplay', onReady);
+    };
+
+    const finish = (callback) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      cleanup();
+      callback();
+    };
+
+    const onReady = () => {
+      finish(resolve);
+    };
+
+    const timeoutId = window.setTimeout(() => {
+      finish(() => reject(
+        createCameraError(
+          'CameraStartupTimeout',
+          'Timed out while waiting for the webcam video stream to become ready.',
+        ),
+      ));
+    }, timeoutMs);
+
+    videoElement.addEventListener('loadedmetadata', onReady);
+    videoElement.addEventListener('loadeddata', onReady);
+    videoElement.addEventListener('canplay', onReady);
   });
 }
 
 export async function startCamera(videoElement, constraints = DEFAULT_CAMERA_CONSTRAINTS) {
+  if (!window.isSecureContext) {
+    throw createCameraError(
+      'InsecureContextError',
+      'Webcam access requires localhost or HTTPS. Serve the app with npm run dev, npm run preview, or a secure host.',
+    );
+  }
+
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('This browser does not support getUserMedia.');
+    throw createCameraError(
+      'GetUserMediaUnavailable',
+      'This browser does not support getUserMedia.',
+    );
   }
 
   stopCamera(videoElement);
@@ -31,8 +83,12 @@ export async function startCamera(videoElement, constraints = DEFAULT_CAMERA_CON
   videoElement.muted = true;
   videoElement.playsInline = true;
 
-  await waitForMetadata(videoElement);
-  await videoElement.play();
+  const playAttempt = videoElement.play();
+  await waitForVideoReady(videoElement);
+
+  if (playAttempt?.catch) {
+    await playAttempt.catch(() => {});
+  }
 
   const track = stream.getVideoTracks()[0];
   const settings = track?.getSettings?.() ?? {};

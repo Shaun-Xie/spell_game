@@ -1,16 +1,9 @@
 import { averagePoint, calculateAngle, distance2D } from './utils.js';
 
-export const GESTURE_MODES = Object.freeze({
-  LEGACY_ONE_HAND: 'legacy_one_hand',
-  TWO_HAND: 'two_hand',
-});
-
-// Active gesture mode switch:
-// set this to GESTURE_MODES.TWO_HAND to re-enable the preserved pair-casting system.
-export const GESTURE_MODE = GESTURE_MODES.LEGACY_ONE_HAND;
+export const GESTURE_MODE = 'legacy_one_hand';
+export const GESTURE_MODE_LABEL = 'Legacy one-hand';
 
 export const GESTURE_THRESHOLDS = {
-  // Shared per-hand tuning for finger states.
   fingerStraightAngle: 158,
   fingerReachRatio: 1.16,
   fingerWristReachRatio: 1.12,
@@ -29,10 +22,6 @@ export const GESTURE_THRESHOLDS = {
   openPalmFingerSpreadRatio: 1.58,
   openPalmAverageTipDistanceRatio: 1.36,
   openPalmSupportTipDistanceRatio: 1.24,
-  openLikeAverageTipDistanceRatio: 1.12,
-  openLikeMinimumRelaxedFingers: 2,
-  threeFingerAverageTipDistanceRatio: 1.16,
-  threeFingerFanSpreadRatio: 1.08,
   thumbsUpThumbAngleMin: 138,
   thumbsUpThumbReachRatioMin: 1.08,
   thumbsUpThumbSpreadRatioMin: 1.04,
@@ -41,21 +30,6 @@ export const GESTURE_THRESHOLDS = {
   thumbsUpNonThumbFanSpreadRatioMax: 1.34,
   fistTipClusterRatio: 1.32,
   fistFingerSpreadRatio: 1.45,
-};
-
-export const TWO_HAND_THRESHOLDS = {
-  // Pair-level spell tuning.
-  prayerPalmDistanceRatio: 1.22,
-  prayerTipAlignmentRatio: 0.58,
-  prayerVerticalOffsetRatio: 0.42,
-  prayerWristDistanceRatioMin: 0.78,
-  fireballChargeDistanceRatio: 1.16,
-  fireballPalmDistanceRatio: 1.3,
-  blockPalmDistanceRatioMin: 1.12,
-  blockPalmDistanceRatioMax: 3.6,
-  blockVerticalOffsetRatio: 1.08,
-  lightningPalmDistanceRatioMin: 0.85,
-  lightningPalmDistanceRatioMax: 4.5,
 };
 
 export const STABILITY_SETTINGS = {
@@ -70,45 +44,23 @@ export const RAW_GESTURE_LABELS = {
   THUMBS_UP: 'Thumbs up',
   OPEN_PALM: 'Open palm',
   INDEX_ONLY: 'Index finger only',
-  THREE_FINGER: 'Three-finger pose',
   INDEX_MIDDLE: 'Index + middle fingers',
 };
 
-export const LEGACY_GESTURE_TO_SPELL = {
+export const GESTURE_TO_SPELL = {
   CLOSED_FIST: 'Fireball',
-  THUMBS_UP: 'Block',
   INDEX_ONLY: 'Lightning',
   INDEX_MIDDLE: 'Heal',
-};
-
-const MODE_LABELS = {
-  [GESTURE_MODES.LEGACY_ONE_HAND]: 'Legacy one-hand',
-  [GESTURE_MODES.TWO_HAND]: 'Two-hand arcana',
+  THUMBS_UP: 'Block',
 };
 
 const HAND_STATE_LABELS = {
   OPEN: 'Open hand',
   FIST: 'Fist',
-  THREE_FINGER: 'Three-finger pose',
   THUMBS_UP: 'Thumbs up',
+  INDEX_ONLY: 'Index finger only',
+  INDEX_MIDDLE: 'Index + middle fingers',
   RELAXED: 'Relaxed / unknown',
-};
-
-const TWO_HAND_CANDIDATE_LABELS = {
-  WAITING_FOR_HANDS: 'No hands detected',
-  WAITING_FOR_SECOND_HAND: 'Need two hands',
-  AMBIGUOUS_PAIR: 'No pair spell',
-  PRAYER_POSE: 'Prayer pose',
-  FIREBALL_CHARGE: 'Fist into open hand',
-  LIGHTNING_ARC: 'Double three-finger',
-  BLOCK_WARD: 'Two open hands',
-};
-
-const TWO_HAND_GESTURE_TO_SPELL = {
-  PRAYER_POSE: 'Heal',
-  FIREBALL_CHARGE: 'Fireball',
-  LIGHTNING_ARC: 'Lightning',
-  BLOCK_WARD: 'Block',
 };
 
 const FINGER_POINTS = {
@@ -131,10 +83,6 @@ function createRatio(numerator, denominator) {
 
 function normalizeX(point, handedness) {
   return handedness === 'Right' ? 1 - point.x : point.x;
-}
-
-function getMirroredScreenX(analysis) {
-  return 1 - analysis.geometry.palmCenter.x;
 }
 
 function getHandGeometry(landmarks, handedness) {
@@ -256,7 +204,7 @@ export function getFingerStates(landmarks, handedness, thresholds = GESTURE_THRE
   };
 }
 
-function analyzeHandPose(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
+export function classifyGesture(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
   const fingerStateBundle = getFingerStates(landmarks, handedness, thresholds);
   const { geometry, metrics } = fingerStateBundle;
   const fingerStates = {
@@ -284,11 +232,9 @@ function analyzeHandPose(landmarks, handedness, thresholds = GESTURE_THRESHOLDS)
   const pinkyReadyForOpenPalm =
     metrics.pinky.relaxedExtended ||
     metrics.pinky.tipDistanceRatio >= thresholds.openPalmSupportTipDistanceRatio;
-  const openPalmFingerConfidence =
-    extendedLongFingers.length >= 3 || metrics.thumb.relaxedExtended;
 
   const looksLikeOpenPalm =
-    openPalmFingerConfidence &&
+    (extendedLongFingers.length >= 3 || metrics.thumb.relaxedExtended) &&
     metrics.index.extended &&
     metrics.middle.extended &&
     ringReadyForOpenPalm &&
@@ -297,8 +243,8 @@ function analyzeHandPose(landmarks, handedness, thresholds = GESTURE_THRESHOLDS)
     averageLongFingerTipDistanceRatio >= thresholds.openPalmAverageTipDistanceRatio;
 
   const looksLikeThumbsUp =
-    // Thumbs-up is intentionally hand-shape based rather than screen-direction based:
-    // the thumb must open clearly away from the palm while the other fingers stay curled.
+    // Block is based on thumb openness + curled non-thumb fingers, so it stays
+    // robust even when the thumb is angled sideways instead of perfectly up.
     metrics.thumb.angle >= thresholds.thumbsUpThumbAngleMin &&
     metrics.thumb.palmReachRatio >= thresholds.thumbsUpThumbReachRatioMin &&
     metrics.thumb.spreadRatio >= thresholds.thumbsUpThumbSpreadRatioMin &&
@@ -317,14 +263,6 @@ function analyzeHandPose(landmarks, handedness, thresholds = GESTURE_THRESHOLDS)
     averageLongFingerTipDistanceRatio <= thresholds.fistTipClusterRatio &&
     fingerFanSpreadRatio <= thresholds.fistFingerSpreadRatio;
 
-  const looksLikeThreeFinger =
-    metrics.index.extended &&
-    metrics.middle.extended &&
-    metrics.ring.extended &&
-    !metrics.pinky.relaxedExtended &&
-    averageLongFingerTipDistanceRatio >= thresholds.threeFingerAverageTipDistanceRatio &&
-    fingerFanSpreadRatio >= thresholds.threeFingerFanSpreadRatio;
-
   const looksLikeIndexOnly =
     metrics.index.extended &&
     !metrics.middle.relaxedExtended &&
@@ -339,339 +277,69 @@ function analyzeHandPose(landmarks, handedness, thresholds = GESTURE_THRESHOLDS)
     !metrics.ring.relaxedExtended &&
     !metrics.pinky.relaxedExtended;
 
-  const openLike =
-    looksLikeOpenPalm ||
-    (
-      relaxedLongFingers.length >= thresholds.openLikeMinimumRelaxedFingers &&
-      metrics.index.relaxedExtended &&
-      metrics.middle.relaxedExtended &&
-      averageLongFingerTipDistanceRatio >= thresholds.openLikeAverageTipDistanceRatio
-    );
-
   let handState = 'RELAXED';
 
   if (looksLikeClosedFist) {
     handState = 'FIST';
   } else if (looksLikeThumbsUp) {
     handState = 'THUMBS_UP';
-  } else if (looksLikeThreeFinger) {
-    handState = 'THREE_FINGER';
+  } else if (looksLikeIndexMiddle) {
+    handState = 'INDEX_MIDDLE';
+  } else if (looksLikeIndexOnly) {
+    handState = 'INDEX_ONLY';
   } else if (looksLikeOpenPalm) {
     handState = 'OPEN';
   }
 
-  let legacyRawGesture = 'UNKNOWN';
+  let rawGesture = 'UNKNOWN';
 
   if (looksLikeClosedFist) {
-    legacyRawGesture = 'CLOSED_FIST';
+    rawGesture = 'CLOSED_FIST';
   } else if (looksLikeIndexOnly) {
-    legacyRawGesture = 'INDEX_ONLY';
+    rawGesture = 'INDEX_ONLY';
   } else if (looksLikeIndexMiddle) {
-    legacyRawGesture = 'INDEX_MIDDLE';
+    rawGesture = 'INDEX_MIDDLE';
   } else if (looksLikeThumbsUp) {
-    legacyRawGesture = 'THUMBS_UP';
-  } else if (looksLikeThreeFinger) {
-    legacyRawGesture = 'THREE_FINGER';
+    rawGesture = 'THUMBS_UP';
   } else if (looksLikeOpenPalm) {
-    legacyRawGesture = 'OPEN_PALM';
+    rawGesture = 'OPEN_PALM';
   }
 
   return {
-    landmarks,
-    handedness,
+    rawGesture,
+    rawGestureLabel: RAW_GESTURE_LABELS[rawGesture],
+    spell: GESTURE_TO_SPELL[rawGesture] ?? null,
     handState,
     handStateLabel: HAND_STATE_LABELS[handState],
-    legacyRawGesture,
-    legacyRawGestureLabel: RAW_GESTURE_LABELS[legacyRawGesture],
-    legacySpell: LEGACY_GESTURE_TO_SPELL[legacyRawGesture] ?? null,
     fingerStates,
-    geometry,
-    metrics,
-    extendedLongFingers,
-    relaxedLongFingers,
-    averageLongFingerTipDistanceRatio,
-    fingerFanSpreadRatio,
-    openLike,
-    receivingHand: handState === 'OPEN' || openLike,
     diagnostics: {
       averageLongFingerTipDistanceRatio,
+      extendedLongFingers,
+      relaxedLongFingers,
       fingerFanSpreadRatio,
-      metrics,
       geometry,
+      metrics,
     },
   };
 }
 
-function assignHandSlots(detections, thresholds = GESTURE_THRESHOLDS) {
-  const analyzedHands = detections.map((detection) => ({
-    ...detection,
-    analysis: analyzeHandPose(detection.landmarks, detection.handedness, thresholds),
-  }));
-
-  const byHandedness = new Map();
-  const unknownHands = [];
-
-  analyzedHands.forEach((hand) => {
-    const handedness = hand.handedness === 'Left' || hand.handedness === 'Right'
-      ? hand.handedness
-      : null;
-
-    if (handedness && !byHandedness.has(handedness)) {
-      byHandedness.set(handedness, hand);
-    } else {
-      unknownHands.push(hand);
-    }
-  });
-
-  unknownHands.sort(
-    (handA, handB) =>
-      getMirroredScreenX(handA.analysis) - getMirroredScreenX(handB.analysis),
-  );
-
-  let leftHand = byHandedness.get('Left') ?? null;
-  let rightHand = byHandedness.get('Right') ?? null;
-
-  if (!leftHand && unknownHands.length) {
-    leftHand = unknownHands.shift() ?? null;
-  }
-
-  if (!rightHand && unknownHands.length) {
-    rightHand = unknownHands.pop() ?? null;
-  }
-
-  return {
-    analyzedHands,
-    leftHand,
-    rightHand,
-  };
-}
-
-function getPairMetrics(leftHand, rightHand) {
-  const leftAnalysis = leftHand.analysis;
-  const rightAnalysis = rightHand.analysis;
-  const averagePalmSize =
-    (leftAnalysis.geometry.palmSize + rightAnalysis.geometry.palmSize) / 2;
-  const palmCenterDistanceRatio = createRatio(
-    distance2D(leftAnalysis.geometry.palmCenter, rightAnalysis.geometry.palmCenter),
-    averagePalmSize,
-  );
-  const wristDistanceRatio = createRatio(
-    distance2D(leftAnalysis.geometry.wrist, rightAnalysis.geometry.wrist),
-    averagePalmSize,
-  );
-  const verticalPalmOffsetRatio = createRatio(
-    Math.abs(leftAnalysis.geometry.palmCenter.y - rightAnalysis.geometry.palmCenter.y),
-    averagePalmSize,
-  );
-  const correspondingTipAlignmentRatio =
-    [
-      FINGER_POINTS.index.tip,
-      FINGER_POINTS.middle.tip,
-      FINGER_POINTS.ring.tip,
-      FINGER_POINTS.pinky.tip,
-    ].reduce(
-      (total, tipIndex) =>
-        total + distance2D(leftHand.landmarks[tipIndex], rightHand.landmarks[tipIndex]),
-      0,
-    ) /
-    (4 * averagePalmSize);
-
-  return {
-    averagePalmSize,
-    palmCenterDistanceRatio,
-    wristDistanceRatio,
-    verticalPalmOffsetRatio,
-    correspondingTipAlignmentRatio,
-  };
-}
-
-function getFireballPair(leftHand, rightHand) {
-  const pairs = [
-    { fistHand: leftHand, supportHand: rightHand },
-    { fistHand: rightHand, supportHand: leftHand },
-  ];
-
-  return pairs.find(
-    ({ fistHand, supportHand }) =>
-      fistHand.analysis.handState === 'FIST' && supportHand.analysis.receivingHand,
-  ) ?? null;
-}
-
-function classifyTwoHandGesture(
-  detections,
-  pairThresholds = TWO_HAND_THRESHOLDS,
-  perHandThresholds = GESTURE_THRESHOLDS,
-) {
-  const { analyzedHands, leftHand, rightHand } = assignHandSlots(detections, perHandThresholds);
-  const handCount = analyzedHands.length;
-  const leftHandStateLabel = leftHand?.analysis.handStateLabel ?? 'No hand';
-  const rightHandStateLabel = rightHand?.analysis.handStateLabel ?? 'No hand';
-
-  if (handCount === 0) {
-    return {
-      handCount,
-      leftHandStateLabel,
-      rightHandStateLabel,
-      candidateKey: 'WAITING_FOR_HANDS',
-      candidateLabel: TWO_HAND_CANDIDATE_LABELS.WAITING_FOR_HANDS,
-      spell: null,
-      diagnostics: {
-        analyzedHands,
-      },
-    };
-  }
-
-  if (handCount < 2 || !leftHand || !rightHand) {
-    return {
-      handCount,
-      leftHandStateLabel,
-      rightHandStateLabel,
-      candidateKey: 'WAITING_FOR_SECOND_HAND',
-      candidateLabel: TWO_HAND_CANDIDATE_LABELS.WAITING_FOR_SECOND_HAND,
-      spell: null,
-      diagnostics: {
-        analyzedHands,
-      },
-    };
-  }
-
-  const pairMetrics = getPairMetrics(leftHand, rightHand);
-  const leftOpenLike = leftHand.analysis.handState === 'OPEN' || leftHand.analysis.openLike;
-  const rightOpenLike = rightHand.analysis.handState === 'OPEN' || rightHand.analysis.openLike;
-  const bothOpenLike = leftOpenLike && rightOpenLike;
-  const bothThreeFinger =
-    leftHand.analysis.handState === 'THREE_FINGER' &&
-    rightHand.analysis.handState === 'THREE_FINGER';
-  const fireballPair = getFireballPair(leftHand, rightHand);
-
-  let looksLikePrayer = false;
-  let looksLikeFireball = false;
-  let looksLikeLightning = false;
-  let looksLikeBlock = false;
-  let fireballDistanceRatio = null;
-
-  if (bothOpenLike) {
-    // Prayer and block care more about a deliberate two-hand relationship than
-    // about every finger being perfectly straight, so we accept the softer
-    // "open-like" state here and let the pair geometry do the heavy lifting.
-    looksLikePrayer =
-      pairMetrics.palmCenterDistanceRatio <= pairThresholds.prayerPalmDistanceRatio &&
-      pairMetrics.correspondingTipAlignmentRatio <= pairThresholds.prayerTipAlignmentRatio &&
-      pairMetrics.verticalPalmOffsetRatio <= pairThresholds.prayerVerticalOffsetRatio &&
-      pairMetrics.wristDistanceRatio >= pairThresholds.prayerWristDistanceRatioMin;
-
-    looksLikeBlock =
-      !looksLikePrayer &&
-      pairMetrics.palmCenterDistanceRatio >= pairThresholds.blockPalmDistanceRatioMin &&
-      pairMetrics.palmCenterDistanceRatio <= pairThresholds.blockPalmDistanceRatioMax &&
-      pairMetrics.verticalPalmOffsetRatio <= pairThresholds.blockVerticalOffsetRatio;
-  }
-
-  if (bothThreeFinger) {
-    looksLikeLightning =
-      pairMetrics.palmCenterDistanceRatio >= pairThresholds.lightningPalmDistanceRatioMin &&
-      pairMetrics.palmCenterDistanceRatio <= pairThresholds.lightningPalmDistanceRatioMax;
-  }
-
-  if (fireballPair) {
-    const receivingPoint = averagePoint([
-      fireballPair.supportHand.analysis.geometry.palmCenter,
-      fireballPair.supportHand.landmarks[9],
-      fireballPair.supportHand.landmarks[13],
-    ]);
-
-    const fistToReceivingPointRatio = createRatio(
-      distance2D(fireballPair.fistHand.analysis.geometry.palmCenter, receivingPoint),
-      pairMetrics.averagePalmSize,
-    );
-    const fistToPalmCenterRatio = createRatio(
-      distance2D(
-        fireballPair.fistHand.analysis.geometry.palmCenter,
-        fireballPair.supportHand.analysis.geometry.palmCenter,
-      ),
-      pairMetrics.averagePalmSize,
-    );
-
-    fireballDistanceRatio = Math.min(fistToReceivingPointRatio, fistToPalmCenterRatio);
-    looksLikeFireball =
-      fireballDistanceRatio <= pairThresholds.fireballChargeDistanceRatio &&
-      fistToPalmCenterRatio <= pairThresholds.fireballPalmDistanceRatio;
-  }
-
-  let candidateKey = 'AMBIGUOUS_PAIR';
-
-  if (looksLikePrayer) {
-    candidateKey = 'PRAYER_POSE';
-  } else if (looksLikeFireball) {
-    candidateKey = 'FIREBALL_CHARGE';
-  } else if (looksLikeLightning) {
-    candidateKey = 'LIGHTNING_ARC';
-  } else if (looksLikeBlock) {
-    candidateKey = 'BLOCK_WARD';
-  }
-
-  return {
-    handCount,
-    leftHandStateLabel,
-    rightHandStateLabel,
-    candidateKey,
-    candidateLabel: TWO_HAND_CANDIDATE_LABELS[candidateKey],
-    spell: TWO_HAND_GESTURE_TO_SPELL[candidateKey] ?? null,
-    diagnostics: {
-      analyzedHands,
-      leftHand,
-      rightHand,
-      pairMetrics: {
-        ...pairMetrics,
-        fireballDistanceRatio,
-      },
-    },
-  };
-}
-
-export function classifyGesture(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
-  const analysis = analyzeHandPose(landmarks, handedness, thresholds);
-
-  return {
-    rawGesture: analysis.legacyRawGesture,
-    rawGestureLabel: analysis.legacyRawGestureLabel,
-    spell: analysis.legacySpell,
-    handState: analysis.handState,
-    handStateLabel: analysis.handStateLabel,
-    fingerStates: analysis.fingerStates,
-    diagnostics: analysis.diagnostics,
-  };
-}
-
-export function classifyLegacyOneHandGesture(
-  landmarks,
-  handedness,
-  thresholds = GESTURE_THRESHOLDS,
-) {
+export function classifyLegacyOneHandGesture(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
   return classifyGesture(landmarks, handedness, thresholds);
 }
 
-function createIdlePayload(mode) {
+function createIdlePayload() {
   return {
-    mode,
-    modeLabel: MODE_LABELS[mode],
-    handCount: 0,
-    leftHandStateLabel: 'No hand',
-    rightHandStateLabel: 'No hand',
-    combinedCandidateKey:
-      mode === GESTURE_MODES.TWO_HAND ? 'WAITING_FOR_HANDS' : 'NO_HAND',
-    combinedCandidateLabel:
-      mode === GESTURE_MODES.TWO_HAND
-        ? TWO_HAND_CANDIDATE_LABELS.WAITING_FOR_HANDS
-        : RAW_GESTURE_LABELS.NO_HAND,
+    mode: GESTURE_MODE,
+    modeLabel: GESTURE_MODE_LABEL,
+    handVisible: false,
+    handStateLabel: 'No hand',
+    rawGesture: 'NO_HAND',
+    rawGestureLabel: RAW_GESTURE_LABELS.NO_HAND,
     diagnostics: null,
   };
 }
 
-export function createGestureController({
-  mode = GESTURE_MODE,
-  stabilitySettings = {},
-} = {}) {
+export function createGestureController({ stabilitySettings = {} } = {}) {
   const settings = { ...STABILITY_SETTINGS, ...stabilitySettings };
   let lastObservedGesture = 'NO_INPUT';
   let consecutiveFrames = 0;
@@ -688,21 +356,19 @@ export function createGestureController({
       consecutiveFrames += 1;
     } else {
       lastObservedGesture = observedGesture;
-      consecutiveFrames = observedGesture === 'NO_INPUT' ? 0 : 1;
+      consecutiveFrames = observedGesture === 'NO_HAND' ? 0 : 1;
     }
 
     if (requireReleaseForGesture && observedGesture !== requireReleaseForGesture) {
       requireReleaseForGesture = null;
     }
 
-    const stableGesture = spell && consecutiveFrames >= settings.framesForConfirmation
-      ? observedGesture
-      : null;
+    const stableGesture =
+      spell && consecutiveFrames >= settings.framesForConfirmation ? observedGesture : null;
     const stableSpell = stableGesture ? spell : null;
     const cooldownSpell = stableSpell ?? lastCast.spell;
-    const lastCastAt = cooldownSpell
-      ? (lastCastAtBySpell[cooldownSpell] ?? -Infinity)
-      : -Infinity;
+    const lastCastAt =
+      cooldownSpell ? (lastCastAtBySpell[cooldownSpell] ?? -Infinity) : -Infinity;
     const cooldownRemainingMs = Math.max(0, lastCastAt + settings.cooldownMs - now);
 
     let confirmedSpell = null;
@@ -720,8 +386,8 @@ export function createGestureController({
 
     return {
       ...payload,
-      rawGesture: observedGesture,
-      rawGestureLabel: observedLabel,
+      mode: GESTURE_MODE,
+      modeLabel: GESTURE_MODE_LABEL,
       stableGesture,
       stableSpell,
       confirmedSpell,
@@ -734,58 +400,26 @@ export function createGestureController({
     };
   }
 
-  function evaluateDetections(detections, now = performance.now()) {
-    const safeDetections = detections ?? [];
-
-    if (mode === GESTURE_MODES.LEGACY_ONE_HAND) {
-      if (!safeDetections.length) {
-        return observeNoHand(now);
-      }
-
-      const primaryDetection = safeDetections[0];
-      const legacyClassification = classifyLegacyOneHandGesture(
-        primaryDetection.landmarks,
-        primaryDetection.handedness,
-      );
-      const { leftHand, rightHand } = assignHandSlots([primaryDetection]);
-      const payload = {
-        mode,
-        modeLabel: MODE_LABELS[mode],
-        handCount: 1,
-        leftHandStateLabel: leftHand?.analysis.handStateLabel ?? 'No hand',
-        rightHandStateLabel: rightHand?.analysis.handStateLabel ?? 'No hand',
-        combinedCandidateKey: legacyClassification.rawGesture,
-        combinedCandidateLabel: legacyClassification.rawGestureLabel,
-        diagnostics: {
-          leftHand,
-          rightHand,
-        },
-      };
-
-      return updateTemporalState(
-        legacyClassification.rawGesture,
-        legacyClassification.rawGestureLabel,
-        legacyClassification.spell,
-        payload,
-        now,
-      );
+  function evaluateDetection(detection, now = performance.now()) {
+    if (!detection?.landmarks) {
+      return observeNoHand(now);
     }
 
-    const twoHandClassification = classifyTwoHandGesture(safeDetections);
+    const classification = classifyLegacyOneHandGesture(
+      detection.landmarks,
+      detection.handedness,
+    );
 
     return updateTemporalState(
-      twoHandClassification.candidateKey,
-      twoHandClassification.candidateLabel,
-      twoHandClassification.spell,
+      classification.rawGesture,
+      classification.rawGestureLabel,
+      classification.spell,
       {
-        mode,
-        modeLabel: MODE_LABELS[mode],
-        handCount: twoHandClassification.handCount,
-        leftHandStateLabel: twoHandClassification.leftHandStateLabel,
-        rightHandStateLabel: twoHandClassification.rightHandStateLabel,
-        combinedCandidateKey: twoHandClassification.candidateKey,
-        combinedCandidateLabel: twoHandClassification.candidateLabel,
-        diagnostics: twoHandClassification.diagnostics,
+        handVisible: true,
+        handStateLabel: classification.handStateLabel,
+        rawGesture: classification.rawGesture,
+        rawGestureLabel: classification.rawGestureLabel,
+        diagnostics: classification.diagnostics,
       },
       now,
     );
@@ -796,24 +430,19 @@ export function createGestureController({
       return observeNoHand(now);
     }
 
-    return evaluateDetections([{ landmarks, handedness }], now);
+    return evaluateDetection({ landmarks, handedness }, now);
   }
 
   function observeNoHand(now = performance.now()) {
-    const payload = createIdlePayload(mode);
-    const observedGesture =
-      mode === GESTURE_MODES.TWO_HAND ? 'WAITING_FOR_HANDS' : 'NO_HAND';
-    const observedLabel = payload.combinedCandidateLabel;
-
-    return updateTemporalState(observedGesture, observedLabel, null, payload, now);
+    return updateTemporalState('NO_HAND', RAW_GESTURE_LABELS.NO_HAND, null, createIdlePayload(), now);
   }
 
   return {
     evaluate,
-    evaluateDetections,
+    evaluateDetection,
     observeNoHand,
     settings,
-    mode,
-    modeLabel: MODE_LABELS[mode],
+    mode: GESTURE_MODE,
+    modeLabel: GESTURE_MODE_LABEL,
   };
 }

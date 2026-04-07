@@ -1,7 +1,6 @@
 export const SPELL_THEME = {
   Neutral: { accent: '#6ee7f9', rgb: '110 231 249' },
   Fireball: { accent: '#fb923c', rgb: '251 146 60' },
-  Shield: { accent: '#38bdf8', rgb: '56 189 248' },
   Block: { accent: '#38bdf8', rgb: '56 189 248' },
   Lightning: { accent: '#facc15', rgb: '250 204 21' },
   Heal: { accent: '#34d399', rgb: '52 211 153' },
@@ -18,6 +17,14 @@ export const HAND_CONNECTIONS = [
 
 export function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+export function lerp(start, end, amount) {
+  return start + (end - start) * amount;
+}
+
+export function randomRange(min, max) {
+  return min + Math.random() * (max - min);
 }
 
 export function distance2D(pointA, pointB) {
