@@ -21,6 +21,33 @@ export const GAME_SETTINGS = {
   laneYFactors: [0.34, 0.54, 0.74],
 };
 
+function createGameError(name, message) {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
+function createResizeBinding(target, callback) {
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(callback);
+    observer.observe(target);
+
+    return {
+      disconnect() {
+        observer.disconnect();
+      },
+    };
+  }
+
+  window.addEventListener('resize', callback);
+
+  return {
+    disconnect() {
+      window.removeEventListener('resize', callback);
+    },
+  };
+}
+
 function rgba(rgb, alpha) {
   return `rgba(${rgb}, ${alpha})`;
 }
@@ -73,7 +100,19 @@ export function createGame({
   onBattleEvent = () => {},
   autoStart = false,
 } = {}) {
-  const context = canvas.getContext('2d');
+  if (!canvas) {
+    throw createGameError('GameCanvasMissingError', 'The battle canvas element is missing.');
+  }
+
+  const context = canvas.getContext?.('2d');
+
+  if (!context) {
+    throw createGameError(
+      'GameCanvasContextError',
+      'The battle canvas could not create a 2D rendering context.',
+    );
+  }
+
   const state = createInitialState();
   let animationFrameId = null;
   let lastFrameTime = 0;
@@ -102,8 +141,7 @@ export function createGame({
     state.player.y = layout.playerY;
   }
 
-  const resizeObserver = new ResizeObserver(syncLayout);
-  resizeObserver.observe(canvas);
+  const resizeBinding = createResizeBinding(canvas, syncLayout);
   syncLayout();
 
   function scheduleNextSpawn() {
@@ -728,7 +766,7 @@ export function createGame({
       animationFrameId = null;
     }
 
-    resizeObserver.disconnect();
+    resizeBinding.disconnect();
   }
 
   scheduleNextSpawn();

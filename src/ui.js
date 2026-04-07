@@ -45,6 +45,33 @@ const ACTIVE_PRESENTATION = {
   },
 };
 
+function createUiError(name, message) {
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
+function createResizeBinding(target, callback) {
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(callback);
+    observer.observe(target);
+
+    return {
+      disconnect() {
+        observer.disconnect();
+      },
+    };
+  }
+
+  window.addEventListener('resize', callback);
+
+  return {
+    disconnect() {
+      window.removeEventListener('resize', callback);
+    },
+  };
+}
+
 function getSpellTheme(spellName) {
   return SPELL_THEME[spellName] ?? SPELL_THEME.Neutral;
 }
@@ -68,25 +95,29 @@ function formatHealth(playerHp, playerMaxHp) {
 }
 
 export function createUI() {
-  createIcons({
-    icons: {
-      CircleHelp,
-      Cpu,
-      Flame,
-      Gauge,
-      Hand,
-      HeartPulse,
-      Radar,
-      RefreshCw,
-      ScrollText,
-      Shield,
-      Sparkles,
-      TriangleAlert,
-      Video,
-      WandSparkles,
-      Zap,
-    },
-  });
+  try {
+    createIcons({
+      icons: {
+        CircleHelp,
+        Cpu,
+        Flame,
+        Gauge,
+        Hand,
+        HeartPulse,
+        Radar,
+        RefreshCw,
+        ScrollText,
+        Shield,
+        Sparkles,
+        TriangleAlert,
+        Video,
+        WandSparkles,
+        Zap,
+      },
+    });
+  } catch (error) {
+    console.warn('[Mage Hands] Lucide icon startup failed.', error);
+  }
 
   const refs = {
     appShell: document.getElementById('appShell'),
@@ -149,11 +180,45 @@ export function createUI() {
     debugLog: document.getElementById('debugLog'),
   };
 
+  const missingRefs = Object.entries(refs)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingRefs.length) {
+    throw createUiError(
+      'UIDomMissingError',
+      `Missing required UI elements: ${missingRefs.join(', ')}`,
+    );
+  }
+
   const overlayContext = refs.overlay.getContext('2d');
-  const confirmSound = new Howl({
-    src: [createToneDataUri()],
-    volume: 0.24,
-  });
+
+  if (!overlayContext) {
+    throw createUiError(
+      'UIOverlayContextError',
+      'Could not create the webcam overlay canvas context.',
+    );
+  }
+
+  const stageGestureLabel =
+    refs.stageGestureBadge.querySelector('span') ?? refs.stageGestureBadge;
+  const confirmSound = (() => {
+    try {
+      return new Howl({
+        src: [createToneDataUri()],
+        volume: 0.24,
+      });
+    } catch (error) {
+      console.warn('[Mage Hands] UI sound startup failed.', error);
+
+      return {
+        play() {
+          return null;
+        },
+        rate() {},
+      };
+    }
+  })();
 
   function getStageMetrics() {
     const viewportWidth = refs.stageViewport.clientWidth;
@@ -199,19 +264,22 @@ export function createUI() {
     overlayContext.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   }
 
-  const resizeObserver = new ResizeObserver(syncOverlaySize);
-  resizeObserver.observe(refs.stageViewport);
+  const resizeBinding = createResizeBinding(refs.stageViewport, syncOverlaySize);
   syncOverlaySize();
 
-  animate(
-    '[data-reveal]',
-    { opacity: [0, 1], transform: ['translateY(18px)', 'translateY(0px)'] },
-    {
-      duration: 0.58,
-      delay: stagger(0.07),
-      easing: [0.22, 1, 0.36, 1],
-    },
-  );
+  try {
+    animate(
+      '[data-reveal]',
+      { opacity: [0, 1], transform: ['translateY(18px)', 'translateY(0px)'] },
+      {
+        duration: 0.58,
+        delay: stagger(0.07),
+        easing: [0.22, 1, 0.36, 1],
+      },
+    );
+  } catch (error) {
+    console.warn('[Mage Hands] Intro animation startup failed.', error);
+  }
 
   function setGestureMode() {
     refs.trackingModePill.textContent = ACTIVE_PRESENTATION.pill;
@@ -358,8 +426,12 @@ export function createUI() {
       Heal: 0.78,
     }[spellName] ?? 1;
 
-    const soundId = confirmSound.play();
-    confirmSound.rate(playbackRate, soundId);
+    try {
+      const soundId = confirmSound.play();
+      confirmSound.rate(playbackRate, soundId);
+    } catch (error) {
+      console.warn('[Mage Hands] Spell confirm audio failed.', error);
+    }
   }
 
   function renderGestureState(state) {
@@ -382,7 +454,7 @@ export function createUI() {
       : state.handVisible
         ? 'Hold a mapped one-hand pose steady for a few frames to cast into the battle lane.'
         : 'Raise one hand inside the webcam frame to begin casting.';
-    refs.stageGestureBadge.querySelector('span').textContent = stableSpell;
+    stageGestureLabel.textContent = stableSpell;
 
     refs.appShell.dataset.spellTheme = state.stableSpell ?? state.confirmedSpell ?? 'Neutral';
 
@@ -440,5 +512,8 @@ export function createUI() {
     setModelStatus,
     setStageNotice,
     syncOverlaySize,
+    dispose() {
+      resizeBinding.disconnect();
+    },
   };
 }
