@@ -88,7 +88,7 @@
                 </p>
               </div>
               <div class="flex flex-wrap gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
-                <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Single Hand</span>
+                <span id="trackingModePill" class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Legacy One-Hand</span>
                 <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Live Inference</span>
                 <span id="cameraResolution" class="rounded-full border border-white/10 bg-white/5 px-3 py-1">Awaiting video</span>
               </div>
@@ -153,7 +153,7 @@
 
                   <div class="grid gap-3 sm:grid-cols-2 md:grid-cols-1">
                     <div class="spell-chip">
-                      <p class="hud-label">Raw Gesture</p>
+                      <p id="stageRawGestureLabel" class="hud-label">Raw Gesture</p>
                       <p id="stageRawGesture" class="mt-2 text-lg font-semibold text-white">No hand detected</p>
                     </div>
                     <div class="spell-chip">
@@ -180,6 +180,10 @@
 
               <dl class="mt-5 space-y-3">
                 <div class="status-row">
+                  <dt class="status-row__label">Gesture Mode</dt>
+                  <dd id="gestureModeText" class="status-row__value">Legacy one-hand</dd>
+                </div>
+                <div class="status-row">
                   <dt class="status-row__label">Camera Status</dt>
                   <dd id="cameraStatusText" class="status-row__value">Waiting to start</dd>
                 </div>
@@ -188,11 +192,23 @@
                   <dd id="modelStatusText" class="status-row__value">Loading Hand Landmarker</dd>
                 </div>
                 <div class="status-row">
-                  <dt class="status-row__label">Hand Status</dt>
+                  <dt class="status-row__label">Tracking Status</dt>
                   <dd id="handStatusText" class="status-row__value">No hand detected</dd>
                 </div>
                 <div class="status-row">
-                  <dt class="status-row__label">Raw Gesture</dt>
+                  <dt class="status-row__label">Detected Hands</dt>
+                  <dd id="handCountText" class="status-row__value">0 hands</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Left Hand</dt>
+                  <dd id="leftHandStateText" class="status-row__value">No hand</dd>
+                </div>
+                <div class="status-row">
+                  <dt class="status-row__label">Right Hand</dt>
+                  <dd id="rightHandStateText" class="status-row__value">No hand</dd>
+                </div>
+                <div class="status-row">
+                  <dt id="rawGestureLabel" class="status-row__label">Raw Gesture</dt>
                   <dd id="rawGestureText" class="status-row__value">No hand detected</dd>
                 </div>
                 <div class="status-row">
@@ -214,7 +230,7 @@
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <p class="font-display text-xl tracking-[0.14em] text-white">Spellbook</p>
-                  <p class="mt-1 text-sm text-slate-400">Mapped hand poses for the demo build.</p>
+                  <p id="spellbookModeDescription" class="mt-1 text-sm text-slate-400">Original single-hand mappings are currently active.</p>
                 </div>
                 <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
                   <i data-lucide="circle-help" class="h-5 w-5"></i>
@@ -225,35 +241,35 @@
                 <article class="spell-card spell-card--fireball">
                   <div class="spell-card__icon"><i data-lucide="flame" class="h-5 w-5"></i></div>
                   <div>
-                    <p class="spell-card__title">Fireball</p>
-                    <p class="spell-card__hint">Closed fist</p>
+                    <p id="spellCardFireballTitle" class="spell-card__title">Fireball</p>
+                    <p id="spellCardFireballHint" class="spell-card__hint">Closed fist</p>
                   </div>
                 </article>
-                <article class="spell-card spell-card--shield">
+                <article class="spell-card spell-card--block">
                   <div class="spell-card__icon"><i data-lucide="shield" class="h-5 w-5"></i></div>
                   <div>
-                    <p class="spell-card__title">Shield</p>
-                    <p class="spell-card__hint">Open palm</p>
+                    <p id="spellCardBlockTitle" class="spell-card__title">Block</p>
+                    <p id="spellCardBlockHint" class="spell-card__hint">Thumbs up</p>
                   </div>
                 </article>
                 <article class="spell-card spell-card--lightning">
                   <div class="spell-card__icon"><i data-lucide="zap" class="h-5 w-5"></i></div>
                   <div>
-                    <p class="spell-card__title">Lightning</p>
-                    <p class="spell-card__hint">Index finger only</p>
+                    <p id="spellCardLightningTitle" class="spell-card__title">Lightning</p>
+                    <p id="spellCardLightningHint" class="spell-card__hint">Index finger only</p>
                   </div>
                 </article>
                 <article class="spell-card spell-card--heal">
                   <div class="spell-card__icon"><i data-lucide="heart-pulse" class="h-5 w-5"></i></div>
                   <div>
-                    <p class="spell-card__title">Heal</p>
-                    <p class="spell-card__hint">Index + middle fingers</p>
+                    <p id="spellCardHealTitle" class="spell-card__title">Heal</p>
+                    <p id="spellCardHealHint" class="spell-card__hint">Index + middle</p>
                   </div>
                 </article>
               </div>
 
-              <div class="mt-5 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
-                Keep your hand centered, spread your fingers clearly, and pause on each gesture for a few frames so the spell can stabilize.
+              <div id="spellbookBodyText" class="mt-5 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
+                Use a single visible hand and hold one of the mapped poses steady for a few frames to confirm a cast.
               </div>
             </section>
 

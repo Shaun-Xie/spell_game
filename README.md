@@ -1,6 +1,6 @@
 # Mage Hands
 
-Mage Hands is a browser-based prototype that turns webcam hand poses into spell casts. This first pass focuses on reliable camera input, MediaPipe hand tracking, rule-based gesture recognition, temporal smoothing, cooldowns, and a polished demo-ready HUD.
+Mage Hands is a browser-based prototype that turns webcam hand poses into spell casts. The current build focuses on reliable camera input, MediaPipe hand tracking, rule-based gesture recognition, temporal smoothing, cooldowns, a polished demo-ready HUD, and a reversible two-hand spellcasting mode.
 
 ## Install
 
@@ -14,7 +14,7 @@ npm install
 npm run dev
 ```
 
-Vite will start a local dev server. Open the printed localhost URL, allow webcam access, and hold one hand in frame.
+Vite will start a local dev server. Open the printed localhost URL, allow webcam access, and hold one hand in frame for the default legacy mode.
 
 ## Build for production
 
@@ -26,10 +26,19 @@ The Vite base path is configured for GitHub Pages project deployment from the `s
 
 ## Gesture mappings
 
+Default mode: `legacy_one_hand`
+
 - `Closed fist` -> `Fireball`
-- `Open palm` -> `Shield`
 - `Index finger only` -> `Lightning`
 - `Index + middle fingers` -> `Heal`
+- `Thumbs up` -> `Block`
+
+Optional preserved mode: `two_hand`
+
+- `Prayer pose` -> `Heal`
+- `Fist into other hand` -> `Fireball`
+- `Three-finger pose on both hands` -> `Lightning`
+- `Two open hands` -> `Block`
 
 If no mapped pose is stable, the HUD shows `No spell`.
 
@@ -61,7 +70,9 @@ spell_game/
 
 ## Tuning guide
 
-- Gesture thresholds live in `src/gestureClassifier.js` inside `GESTURE_THRESHOLDS`.
+- The active recognition mode switch lives in `src/gestureClassifier.js` as `GESTURE_MODE`.
+- Per-hand thresholds live in `src/gestureClassifier.js` inside `GESTURE_THRESHOLDS`.
+- Pair-level two-hand thresholds live in `src/gestureClassifier.js` inside `TWO_HAND_THRESHOLDS`.
 - Smoothing and cooldown live in `src/gestureClassifier.js` inside `STABILITY_SETTINGS`.
 - Theme colors, spacing, panel styles, and animation polish live in `src/styles.css`.
 - The GitHub Pages deployment base path lives in `vite.config.js`.

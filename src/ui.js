@@ -18,6 +18,7 @@ import {
 } from 'lucide';
 import { animate, stagger } from 'motion';
 import { Howl } from 'howler';
+import { GESTURE_MODES } from './gestureClassifier.js';
 import { HAND_CONNECTIONS, SPELL_THEME, createToneDataUri, formatDuration, timeStampLabel } from './utils.js';
 
 const STATUS_BADGE_CLASS_MAP = {
@@ -32,6 +33,37 @@ const STATUS_BADGE_CLASS_MAP = {
 function getSpellTheme(spellName) {
   return SPELL_THEME[spellName] ?? SPELL_THEME.Neutral;
 }
+
+const MODE_PRESENTATION = {
+  [GESTURE_MODES.TWO_HAND]: {
+    label: 'Two-hand arcana',
+    pill: 'Two-Hand Mode',
+    candidateLabel: 'Combined Candidate',
+    spellbookDescription: 'Mapped hand poses for the current recognition mode.',
+    spellbookBody:
+      'Bring both hands into frame, hold the pair pose deliberately, and pause for a few frames so the combined spell can stabilize.',
+    spellbook: {
+      fireball: { title: 'Fireball', hint: 'Fist into other hand' },
+      block: { title: 'Block', hint: 'Two open hands' },
+      lightning: { title: 'Lightning', hint: 'Three fingers on both hands' },
+      heal: { title: 'Heal', hint: 'Prayer pose' },
+    },
+  },
+  [GESTURE_MODES.LEGACY_ONE_HAND]: {
+    label: 'Legacy one-hand',
+    pill: 'Legacy One-Hand',
+    candidateLabel: 'Raw Gesture',
+    spellbookDescription: 'Original single-hand mappings are currently active.',
+    spellbookBody:
+      'Use a single visible hand and hold one of the mapped poses steady for a few frames to confirm a cast.',
+    spellbook: {
+      fireball: { title: 'Fireball', hint: 'Closed fist' },
+      block: { title: 'Block', hint: 'Thumbs up' },
+      lightning: { title: 'Lightning', hint: 'Index finger only' },
+      heal: { title: 'Heal', hint: 'Index + middle' },
+    },
+  },
+};
 
 function animateBadge(element) {
   animate(
@@ -67,6 +99,7 @@ export function createUI() {
     video: document.getElementById('webcam'),
     overlay: document.getElementById('landmarkOverlay'),
     stageViewport: document.getElementById('stageViewport'),
+    trackingModePill: document.getElementById('trackingModePill'),
     cameraRetryButton: document.getElementById('cameraRetryButton'),
     stageNotice: document.getElementById('stageNotice'),
     stageNoticeTitle: document.getElementById('stageNoticeTitle'),
@@ -78,16 +111,32 @@ export function createUI() {
     cameraStatusText: document.getElementById('cameraStatusText'),
     modelStatusText: document.getElementById('modelStatusText'),
     handStatusText: document.getElementById('handStatusText'),
+    gestureModeText: document.getElementById('gestureModeText'),
+    handCountText: document.getElementById('handCountText'),
+    leftHandStateText: document.getElementById('leftHandStateText'),
+    rightHandStateText: document.getElementById('rightHandStateText'),
+    rawGestureLabel: document.getElementById('rawGestureLabel'),
     rawGestureText: document.getElementById('rawGestureText'),
     stableSpellText: document.getElementById('stableSpellText'),
     cooldownText: document.getElementById('cooldownText'),
     debugMessageText: document.getElementById('debugMessageText'),
     stageSpellName: document.getElementById('stageSpellName'),
     stageSpellDetail: document.getElementById('stageSpellDetail'),
+    stageRawGestureLabel: document.getElementById('stageRawGestureLabel'),
     stageRawGesture: document.getElementById('stageRawGesture'),
     stageCooldown: document.getElementById('stageCooldown'),
     spellReadoutCard: document.getElementById('spellReadoutCard'),
     cameraResolution: document.getElementById('cameraResolution'),
+    spellbookModeDescription: document.getElementById('spellbookModeDescription'),
+    spellbookBodyText: document.getElementById('spellbookBodyText'),
+    spellCardFireballTitle: document.getElementById('spellCardFireballTitle'),
+    spellCardFireballHint: document.getElementById('spellCardFireballHint'),
+    spellCardBlockTitle: document.getElementById('spellCardBlockTitle'),
+    spellCardBlockHint: document.getElementById('spellCardBlockHint'),
+    spellCardLightningTitle: document.getElementById('spellCardLightningTitle'),
+    spellCardLightningHint: document.getElementById('spellCardLightningHint'),
+    spellCardHealTitle: document.getElementById('spellCardHealTitle'),
+    spellCardHealHint: document.getElementById('spellCardHealHint'),
     debugLog: document.getElementById('debugLog'),
   };
 
@@ -155,6 +204,29 @@ export function createUI() {
     },
   );
 
+  function setGestureMode(mode) {
+    const presentation = MODE_PRESENTATION[mode] ?? MODE_PRESENTATION[GESTURE_MODES.TWO_HAND];
+
+    refs.trackingModePill.textContent = presentation.pill;
+    refs.gestureModeText.textContent = presentation.label;
+    refs.rawGestureLabel.textContent = presentation.candidateLabel;
+    refs.stageRawGestureLabel.textContent = presentation.candidateLabel;
+    refs.spellbookModeDescription.textContent = presentation.spellbookDescription;
+    refs.spellbookBodyText.textContent = presentation.spellbookBody;
+    refs.spellCardFireballTitle.textContent = presentation.spellbook.fireball.title;
+    refs.spellCardFireballHint.textContent = presentation.spellbook.fireball.hint;
+    refs.spellCardBlockTitle.textContent = presentation.spellbook.block.title;
+    refs.spellCardBlockHint.textContent = presentation.spellbook.block.hint;
+    refs.spellCardLightningTitle.textContent = presentation.spellbook.lightning.title;
+    refs.spellCardLightningHint.textContent = presentation.spellbook.lightning.hint;
+    refs.spellCardHealTitle.textContent = presentation.spellbook.heal.title;
+    refs.spellCardHealHint.textContent = presentation.spellbook.heal.hint;
+  }
+
+  function formatHandCount(count) {
+    return `${count} ${count === 1 ? 'hand' : 'hands'}`;
+  }
+
   function setStatusBadge(element, text, tone) {
     element.textContent = text;
     element.className = STATUS_BADGE_CLASS_MAP[tone] ?? STATUS_BADGE_CLASS_MAP.idle;
@@ -217,8 +289,14 @@ export function createUI() {
     overlayContext.clearRect(0, 0, viewportWidth, viewportHeight);
   }
 
-  function drawHandOverlay(landmarks, spellName = 'Neutral') {
-    if (!landmarks?.length) {
+  function drawHandOverlay(handDetections, spellName = 'Neutral') {
+    const hands = Array.isArray(handDetections)
+      ? handDetections
+      : handDetections
+        ? [{ landmarks: handDetections }]
+        : [];
+
+    if (!hands.length) {
       clearOverlay();
       return;
     }
@@ -234,34 +312,39 @@ export function createUI() {
     const theme = getSpellTheme(spellName);
     const scale = Math.max(0.8, Math.min(contentWidth / 960, 1.05));
 
-    overlayContext.lineWidth = 2.1 * scale;
-    overlayContext.strokeStyle = `rgba(${theme.rgb}, 0.78)`;
-    overlayContext.fillStyle = `rgba(${theme.rgb}, 0.92)`;
-    overlayContext.shadowColor = `rgba(${theme.rgb}, 0.34)`;
-    overlayContext.shadowBlur = 15 * scale;
+    hands.forEach((hand, handIndex) => {
+      const landmarks = hand.landmarks ?? hand;
+      const opacity = hands.length > 1 ? (handIndex === 0 ? 0.82 : 0.64) : 0.78;
 
-    HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {
-      const start = landmarks[startIndex];
-      const end = landmarks[endIndex];
+      overlayContext.lineWidth = 2.05 * scale;
+      overlayContext.strokeStyle = `rgba(${theme.rgb}, ${opacity})`;
+      overlayContext.fillStyle = `rgba(${theme.rgb}, ${Math.min(opacity + 0.12, 0.96)})`;
+      overlayContext.shadowColor = `rgba(${theme.rgb}, 0.34)`;
+      overlayContext.shadowBlur = 15 * scale;
 
-      overlayContext.beginPath();
-      overlayContext.moveTo(offsetX + start.x * contentWidth, offsetY + start.y * contentHeight);
-      overlayContext.lineTo(offsetX + end.x * contentWidth, offsetY + end.y * contentHeight);
-      overlayContext.stroke();
-    });
+      HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {
+        const start = landmarks[startIndex];
+        const end = landmarks[endIndex];
 
-    landmarks.forEach((landmark, index) => {
-      const radius = (index % 4 === 0 ? 4 : 3) * scale;
+        overlayContext.beginPath();
+        overlayContext.moveTo(offsetX + start.x * contentWidth, offsetY + start.y * contentHeight);
+        overlayContext.lineTo(offsetX + end.x * contentWidth, offsetY + end.y * contentHeight);
+        overlayContext.stroke();
+      });
 
-      overlayContext.beginPath();
-      overlayContext.arc(
-        offsetX + landmark.x * contentWidth,
-        offsetY + landmark.y * contentHeight,
-        radius,
-        0,
-        Math.PI * 2,
-      );
-      overlayContext.fill();
+      landmarks.forEach((landmark, index) => {
+        const radius = (index % 4 === 0 ? 4 : 3) * scale;
+
+        overlayContext.beginPath();
+        overlayContext.arc(
+          offsetX + landmark.x * contentWidth,
+          offsetY + landmark.y * contentHeight,
+          radius,
+          0,
+          Math.PI * 2,
+        );
+        overlayContext.fill();
+      });
     });
   }
 
@@ -269,6 +352,7 @@ export function createUI() {
     const playbackRate = {
       Fireball: 0.95,
       Shield: 0.88,
+      Block: 0.88,
       Lightning: 1.12,
       Heal: 0.78,
     }[spellName] ?? 1;
@@ -279,20 +363,29 @@ export function createUI() {
 
   function renderGestureState(state) {
     const stableSpell = state.stableSpell ?? 'No spell';
+    const candidateLabel = state.combinedCandidateLabel ?? state.rawGestureLabel;
     const cooldownLabel =
       state.cooldown.remainingMs > 0 && state.cooldown.spell
         ? `${state.cooldown.spell} recharging · ${formatDuration(state.cooldown.remainingMs)}`
         : 'Ready';
 
-    refs.rawGestureText.textContent = state.rawGestureLabel;
+    refs.gestureModeText.textContent = state.modeLabel ?? MODE_PRESENTATION[GESTURE_MODES.TWO_HAND].label;
+    refs.handCountText.textContent = formatHandCount(state.handCount ?? 0);
+    refs.leftHandStateText.textContent = state.leftHandStateLabel ?? 'No hand';
+    refs.rightHandStateText.textContent = state.rightHandStateLabel ?? 'No hand';
+    refs.rawGestureText.textContent = candidateLabel;
     refs.stableSpellText.textContent = stableSpell;
     refs.cooldownText.textContent = cooldownLabel;
-    refs.stageRawGesture.textContent = state.rawGestureLabel;
+    refs.stageRawGesture.textContent = candidateLabel;
     refs.stageCooldown.textContent = cooldownLabel;
     refs.stageSpellName.textContent = stableSpell;
     refs.stageSpellDetail.textContent = state.stableSpell
       ? `${state.framesHeld} steady frames locked. Hold or release to switch spells.`
-      : 'Hold a mapped pose for a few frames to stabilize recognition.';
+      : state.mode === GESTURE_MODES.TWO_HAND
+        ? state.handCount === 1
+          ? 'One hand is visible. Bring the second hand into frame for pair casting.'
+          : 'Hold a mapped two-hand pose for a few frames to stabilize recognition.'
+        : 'Hold a mapped one-hand pose for a few frames to stabilize recognition.';
     refs.stageGestureBadge.querySelector('span').textContent = stableSpell;
 
     const themeSpell = state.stableSpell ?? state.confirmedSpell ?? 'Neutral';
@@ -313,6 +406,7 @@ export function createUI() {
     playSpellConfirm,
     pushDebugMessage,
     renderGestureState,
+    setGestureMode,
     setCameraMeta,
     setCameraStatus,
     setDebugMessage,

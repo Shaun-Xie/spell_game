@@ -1,18 +1,20 @@
 import './styles.css';
 import { describeCameraSettings, startCamera, stopCamera } from './camera.js';
-import { createGestureController } from './gestureClassifier.js';
+import { GESTURE_MODE, GESTURE_MODES, createGestureController } from './gestureClassifier.js';
 import { createHandTracker } from './handTracker.js';
 import { createUI } from './ui.js';
 
 const ui = createUI();
 const handTracker = createHandTracker();
-const gestureController = createGestureController();
+const gestureController = createGestureController({ mode: GESTURE_MODE });
+
+ui.setGestureMode(gestureController.mode);
 
 let cameraSession = null;
 let animationFrameId = null;
 let modelReady = false;
 let cameraReady = false;
-let lastRawGesture = 'NO_HAND';
+let lastCandidateKey = 'NO_INPUT';
 let handPreviouslyVisible = false;
 
 function describeCameraError(error) {
@@ -38,14 +40,105 @@ function stopRenderLoop() {
   }
 }
 
+function getTrackingIdleCopy() {
+  if (gestureController.mode === GESTURE_MODES.TWO_HAND) {
+    return {
+      title: 'Raise both hands into view',
+      hint: 'Hold a mapped two-hand pose steady for a few frames to confirm a spell.',
+    };
+  }
+
+  return {
+    title: 'Raise one hand into view',
+    hint: 'Hold a mapped pose steady for a few frames to confirm a spell.',
+  };
+}
+
+function getTrackingMessage(state) {
+  if (state.mode === GESTURE_MODES.TWO_HAND) {
+    if (state.handCount === 0) {
+      return 'Tracking is active, but no hands are currently visible.';
+    }
+
+    if (state.handCount === 1) {
+      return 'One hand detected. A second hand is required for two-hand spell casting.';
+    }
+
+    if (!state.combinedCandidateKey || state.combinedCandidateKey === 'AMBIGUOUS_PAIR') {
+      return 'Two hands detected, but the pair pose does not match a mapped spell yet.';
+    }
+
+    return `Detected pair candidate: ${state.combinedCandidateLabel}.`;
+  }
+
+  if (state.rawGesture === 'UNKNOWN') {
+    return 'Hand detected, but the pose does not match one of the mapped spells yet.';
+  }
+
+  if (state.rawGesture === 'NO_HAND') {
+    return 'Tracking is active, but no hand is currently visible.';
+  }
+
+  return `Detected raw gesture: ${state.rawGestureLabel}.`;
+}
+
+function updateStageNoticeForState(state) {
+  if (state.mode === GESTURE_MODES.TWO_HAND) {
+    if (state.handCount === 0) {
+      ui.setStageNotice({
+        title: 'Two hands needed',
+        hint: 'Lift both hands into the webcam frame to begin pair casting.',
+        tone: 'neutral',
+        hidden: false,
+        showRetry: false,
+      });
+      return;
+    }
+
+    if (state.handCount === 1) {
+      ui.setStageNotice({
+        title: 'Second hand needed',
+        hint: 'Pair spells only trigger when both hands are visible and held intentionally.',
+        tone: 'neutral',
+        hidden: false,
+        showRetry: false,
+      });
+      return;
+    }
+  } else if (state.handCount === 0) {
+    ui.setStageNotice({
+      title: 'No hand detected',
+      hint: 'Raise one hand inside the webcam frame to begin casting.',
+      tone: 'neutral',
+      hidden: false,
+      showRetry: false,
+    });
+    return;
+  }
+
+  ui.setStageNotice({
+    title: 'Hand tracking locked',
+    hint: 'Landmarks are updating in real time. Hold a mapped pose to confirm a spell.',
+    tone: 'neutral',
+    hidden: true,
+    showRetry: false,
+  });
+}
+
+function describeTrackedHands(count) {
+  return `${count} ${count === 1 ? 'hand' : 'hands'} visible`;
+}
+
 function maybeStartLoop() {
   if (!modelReady || !cameraReady || animationFrameId) {
     return;
   }
 
+  const idleCopy = getTrackingIdleCopy();
+
   ui.setStageNotice({
-    title: 'Raise one hand into view',
-    hint: 'Hold a mapped pose steady for a few frames to confirm a spell.',
+    title: idleCopy.title,
+    hint: idleCopy.hint,
     tone: 'neutral',
     hidden: false,
     showRetry: false,
@@ -60,64 +153,42 @@ function maybeStartLoop() {
       return;
     }
 
-    const detection = handTracker.getPrimaryDetection(result);
+    const detections = handTracker.getDetections(result);
 
-    if (!detection) {
+    if (!detections.length) {
       const noHandState = gestureController.observeNoHand(timestamp);
       ui.clearOverlay();
       ui.setHandStatus('idle', 'No hand detected');
       ui.renderGestureState(noHandState);
-      ui.setDebugMessage('Tracking is active, but no hand is currently visible.');
-      ui.setStageNotice({
-        title: 'No hand detected',
-        hint: 'Raise one hand inside the webcam frame to begin casting.',
-        tone: 'neutral',
-        hidden: false,
-        showRetry: false,
-      });
+      ui.setDebugMessage(getTrackingMessage(noHandState));
+      updateStageNoticeForState(noHandState);
 
       if (handPreviouslyVisible) {
         ui.pushDebugMessage('Hand left the frame.');
         handPreviouslyVisible = false;
       }
 
-      lastRawGesture = 'NO_HAND';
+      lastCandidateKey = noHandState.combinedCandidateKey ?? 'NO_INPUT';
       return;
     }
 
+    const gestureState = gestureController.evaluateDetections(detections, timestamp);
     handPreviouslyVisible = true;
-    ui.setHandStatus('active', `${detection.handedness} hand tracking live`);
-    ui.setStageNotice({
-      title: 'Hand tracking locked',
-      hint: 'Landmarks are updating in real time. Hold a mapped pose to confirm a spell.',
-      tone: 'neutral',
-      hidden: true,
-      showRetry: false,
-    });
-
-    const gestureState = gestureController.evaluate(
-      detection.landmarks,
-      detection.handedness,
-      timestamp,
-    );
+    ui.setHandStatus('active', describeTrackedHands(gestureState.handCount));
+    updateStageNoticeForState(gestureState);
 
     ui.renderGestureState(gestureState);
-    ui.drawHandOverlay(detection.landmarks, gestureState.stableSpell ?? gestureState.confirmedSpell);
+    ui.drawHandOverlay(detections, gestureState.stableSpell ?? gestureState.confirmedSpell);
 
-    if (gestureState.rawGesture !== lastRawGesture) {
-      if (gestureState.rawGesture === 'UNKNOWN') {
-        ui.setDebugMessage('Hand detected, but the pose does not match one of the mapped spells yet.');
-      } else {
-        ui.setDebugMessage(`Detected raw gesture: ${gestureState.rawGestureLabel}.`);
-      }
-
-      lastRawGesture = gestureState.rawGesture;
+    if ((gestureState.combinedCandidateKey ?? gestureState.rawGesture) !== lastCandidateKey) {
+      ui.setDebugMessage(getTrackingMessage(gestureState));
+      lastCandidateKey = gestureState.combinedCandidateKey ?? gestureState.rawGesture;
     }
 
     if (gestureState.confirmedSpell) {
       ui.setDebugMessage(`${gestureState.confirmedSpell} confirmed and cooldown started.`);
       ui.pushDebugMessage(
-        `${gestureState.confirmedSpell} confirmed from ${gestureState.rawGestureLabel.toLowerCase()}.`,
+        `${gestureState.confirmedSpell} confirmed from ${gestureState.combinedCandidateLabel.toLowerCase()}.`,
       );
       ui.playSpellConfirm(gestureState.confirmedSpell);
     }
@@ -191,6 +262,7 @@ async function boot() {
   ui.setCameraStatus('loading', 'Starting');
   ui.setModelStatus('loading', 'Loading');
   ui.setHandStatus('idle', 'Stand by');
+  ui.renderGestureState(gestureController.observeNoHand());
 
   await Promise.allSettled([initializeModel(), initializeCamera()]);
   maybeStartLoop();
@@ -198,7 +270,7 @@ async function boot() {
 
 async function retrySetup() {
   stopRenderLoop();
-  lastRawGesture = 'NO_HAND';
+  lastCandidateKey = 'NO_INPUT';
   handPreviouslyVisible = false;
 
   if (!modelReady) {
