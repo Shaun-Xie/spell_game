@@ -51,7 +51,7 @@ export const GESTURE_TO_SPELL = {
   CLOSED_FIST: 'Fireball',
   INDEX_ONLY: 'Lightning',
   INDEX_MIDDLE: 'Heal',
-  THUMBS_UP: 'Block',
+  THUMBS_UP: 'Freeze',
 };
 
 const HAND_STATE_LABELS = {
@@ -243,7 +243,7 @@ export function classifyGesture(landmarks, handedness, thresholds = GESTURE_THRE
     averageLongFingerTipDistanceRatio >= thresholds.openPalmAverageTipDistanceRatio;
 
   const looksLikeThumbsUp =
-    // Block is based on thumb openness + curled non-thumb fingers, so it stays
+    // Freeze is based on thumb openness + curled non-thumb fingers, so it stays
     // robust even when the thumb is angled sideways instead of perfectly up.
     metrics.thumb.angle >= thresholds.thumbsUpThumbAngleMin &&
     metrics.thumb.palmReachRatio >= thresholds.thumbsUpThumbReachRatioMin &&

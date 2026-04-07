@@ -15,32 +15,32 @@
   --text-strong: #f4f7ff;
   --text-muted: #93a0ba;
   --spell-accent: #6ee7f9;
-  --spell-accent-rgb: 110 231 249;
+  --spell-accent-rgb: 110, 231, 249;
 }
 
 [data-spell-theme="Neutral"] {
   --spell-accent: #6ee7f9;
-  --spell-accent-rgb: 110 231 249;
+  --spell-accent-rgb: 110, 231, 249;
 }
 
 [data-spell-theme="Fireball"] {
   --spell-accent: #fb923c;
-  --spell-accent-rgb: 251 146 60;
+  --spell-accent-rgb: 251, 146, 60;
 }
 
-[data-spell-theme="Block"] {
-  --spell-accent: #38bdf8;
-  --spell-accent-rgb: 56 189 248;
+[data-spell-theme="Freeze"] {
+  --spell-accent: #bfdbfe;
+  --spell-accent-rgb: 191, 219, 254;
 }
 
 [data-spell-theme="Lightning"] {
   --spell-accent: #facc15;
-  --spell-accent-rgb: 250 204 21;
+  --spell-accent-rgb: 250, 204, 21;
 }
 
 [data-spell-theme="Heal"] {
   --spell-accent: #34d399;
-  --spell-accent-rgb: 52 211 153;
+  --spell-accent-rgb: 52, 211, 153;
 }
 
 html,
@@ -406,9 +406,9 @@ body {
   box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.18);
 }
 
-.spell-card--block .spell-card__icon {
-  color: #7dd3fc;
-  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.18);
+.spell-card--freeze .spell-card__icon {
+  color: #bfdbfe;
+  box-shadow: inset 0 0 0 1px rgba(191, 219, 254, 0.22);
 }
 
 .spell-card--lightning .spell-card__icon {

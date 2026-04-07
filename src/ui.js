@@ -8,7 +8,7 @@ import {
   Radar,
   RefreshCw,
   ScrollText,
-  Shield,
+  Snowflake,
   Sparkles,
   TriangleAlert,
   Video,
@@ -46,7 +46,7 @@ const ACTIVE_PRESENTATION = {
     'Defend the left-side ward with one hand. Hold a mapped pose long enough for it to stabilize, then the battle lane responds to the confirmed spell.',
   spellbook: {
     fireball: { title: 'Fireball', hint: 'Closed fist' },
-    block: { title: 'Block', hint: 'Thumbs up' },
+    freeze: { title: 'Freeze', hint: 'Thumbs up' },
     lightning: { title: 'Lightning', hint: 'Index finger only' },
     heal: { title: 'Heal', hint: 'Index + middle' },
   },
@@ -91,10 +91,10 @@ function animateBadge(element) {
   );
 }
 
-function formatWardStatus(shieldRemainingMs) {
-  return shieldRemainingMs > 0
-    ? `Ward active · ${formatDuration(shieldRemainingMs)}`
-    : 'Ward offline';
+function formatFreezeStatus(freezeRemainingMs) {
+  return freezeRemainingMs > 0
+    ? `Frost echo · ${formatDuration(freezeRemainingMs)}`
+    : 'Idle';
 }
 
 function formatHealth(playerHp, playerMaxHp) {
@@ -114,7 +114,7 @@ export function createUI() {
         Radar,
         RefreshCw,
         ScrollText,
-        Shield,
+        Snowflake,
         Sparkles,
         TriangleAlert,
         Video,
@@ -133,7 +133,7 @@ export function createUI() {
     arenaHpValue: document.getElementById('arenaHpValue'),
     arenaScoreValue: document.getElementById('arenaScoreValue'),
     arenaEnemiesValue: document.getElementById('arenaEnemiesValue'),
-    arenaWardValue: document.getElementById('arenaWardValue'),
+    arenaFreezeValue: document.getElementById('arenaFreezeValue'),
     arenaFeedText: document.getElementById('arenaFeedText'),
     gameOverOverlay: document.getElementById('gameOverOverlay'),
     gameOverTitle: document.getElementById('gameOverTitle'),
@@ -161,7 +161,7 @@ export function createUI() {
     stableSpellText: document.getElementById('stableSpellText'),
     cooldownText: document.getElementById('cooldownText'),
     playerHpText: document.getElementById('playerHpText'),
-    wardStatusText: document.getElementById('wardStatusText'),
+    freezeStatusText: document.getElementById('freezeStatusText'),
     enemiesText: document.getElementById('enemiesText'),
     scoreText: document.getElementById('scoreText'),
     defeatedText: document.getElementById('defeatedText'),
@@ -178,8 +178,8 @@ export function createUI() {
     spellbookBodyText: document.getElementById('spellbookBodyText'),
     spellCardFireballTitle: document.getElementById('spellCardFireballTitle'),
     spellCardFireballHint: document.getElementById('spellCardFireballHint'),
-    spellCardBlockTitle: document.getElementById('spellCardBlockTitle'),
-    spellCardBlockHint: document.getElementById('spellCardBlockHint'),
+    spellCardFreezeTitle: document.getElementById('spellCardFreezeTitle'),
+    spellCardFreezeHint: document.getElementById('spellCardFreezeHint'),
     spellCardLightningTitle: document.getElementById('spellCardLightningTitle'),
     spellCardLightningHint: document.getElementById('spellCardLightningHint'),
     spellCardHealTitle: document.getElementById('spellCardHealTitle'),
@@ -297,8 +297,8 @@ export function createUI() {
     refs.spellbookBodyText.textContent = ACTIVE_PRESENTATION.spellbookBody;
     refs.spellCardFireballTitle.textContent = ACTIVE_PRESENTATION.spellbook.fireball.title;
     refs.spellCardFireballHint.textContent = ACTIVE_PRESENTATION.spellbook.fireball.hint;
-    refs.spellCardBlockTitle.textContent = ACTIVE_PRESENTATION.spellbook.block.title;
-    refs.spellCardBlockHint.textContent = ACTIVE_PRESENTATION.spellbook.block.hint;
+    refs.spellCardFreezeTitle.textContent = ACTIVE_PRESENTATION.spellbook.freeze.title;
+    refs.spellCardFreezeHint.textContent = ACTIVE_PRESENTATION.spellbook.freeze.hint;
     refs.spellCardLightningTitle.textContent = ACTIVE_PRESENTATION.spellbook.lightning.title;
     refs.spellCardLightningHint.textContent = ACTIVE_PRESENTATION.spellbook.lightning.hint;
     refs.spellCardHealTitle.textContent = ACTIVE_PRESENTATION.spellbook.heal.title;
@@ -428,7 +428,7 @@ export function createUI() {
   function playSpellConfirm(spellName) {
     const playbackRate = {
       Fireball: 0.95,
-      Block: 0.88,
+      Freeze: 0.84,
       Lightning: 1.12,
       Heal: 0.78,
     }[spellName] ?? 1;
@@ -474,7 +474,7 @@ export function createUI() {
 
   function renderGameState(state) {
     refs.playerHpText.textContent = formatHealth(state.playerHp, state.playerMaxHp);
-    refs.wardStatusText.textContent = formatWardStatus(state.shieldRemainingMs);
+    refs.freezeStatusText.textContent = formatFreezeStatus(state.freezeRemainingMs);
     refs.enemiesText.textContent = `${state.enemiesAlive}`;
     refs.scoreText.textContent = `${state.score}`;
     refs.defeatedText.textContent = `${state.defeatedEnemies}`;
@@ -483,13 +483,13 @@ export function createUI() {
     refs.arenaHpValue.textContent = formatHealth(state.playerHp, state.playerMaxHp);
     refs.arenaScoreValue.textContent = `${state.score}`;
     refs.arenaEnemiesValue.textContent = `${state.enemiesAlive}`;
-    refs.arenaWardValue.textContent = state.shieldActive ? 'Active' : 'Offline';
+    refs.arenaFreezeValue.textContent = state.freezeActive ? 'Active' : 'Idle';
     refs.arenaFeedText.textContent = state.feedText;
 
     if (state.gameOver) {
       setGameStateBadge('Game Over', 'error');
-    } else if (state.shieldActive) {
-      setGameStateBadge('Ward Active', 'active');
+    } else if (state.freezeActive) {
+      setGameStateBadge('Freeze Cast', 'active');
     } else {
       setGameStateBadge('Battle Running', 'ready');
     }

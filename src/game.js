@@ -56,7 +56,7 @@ function createInitialState() {
       radius: GAME_SETTINGS.playerRadius,
       x: 0,
       y: 0,
-      blockUntil: 0,
+      freezeCastMs: 0,
       healPulseMs: 0,
       damageFlashMs: 0,
     },
@@ -204,38 +204,10 @@ export function createGame({
   }
 
   function damagePlayer(baseDamage, now) {
-    const blockRemainingMs = Math.max(0, state.player.blockUntil - now);
-    const mitigation = blockRemainingMs > 0 ? SPELL_CONFIG.Block.mitigation : 0;
-    const finalDamage = Math.max(1, Math.round(baseDamage * (1 - mitigation)));
+    const finalDamage = Math.max(1, Math.round(baseDamage));
     state.player.hp = clamp(state.player.hp - finalDamage, 0, state.player.maxHp);
     state.player.damageFlashMs = 240;
-
-    if (blockRemainingMs > 0) {
-      state.rings.push(
-        createRingEffect({
-          x: state.player.x,
-          y: state.player.y,
-          color: '56 189 248',
-          maxRadius: state.player.radius * 2.1,
-          lifeMs: 320,
-          lineWidth: 3,
-        }),
-      );
-      state.particles.push(
-        ...createBurstParticles({
-          x: state.player.x + state.player.radius * 0.8,
-          y: state.player.y,
-          color: '56 189 248',
-          count: 10,
-          minSpeed: 40,
-          maxSpeed: 150,
-          lifeMs: 320,
-        }),
-      );
-      pushBattleEvent(`Ward absorbed part of the hit (${finalDamage} damage)`);
-    } else {
-      pushBattleEvent(`The mage took ${finalDamage} damage`);
-    }
+    pushBattleEvent(`The mage took ${finalDamage} damage`);
 
     if (state.player.hp <= 0) {
       state.gameOver = true;
@@ -244,12 +216,15 @@ export function createGame({
   }
 
   function defeatEnemy(enemy, now, spellName = 'Neutral') {
-    const scoreValue =
-      spellName === 'Fireball'
-        ? SPELL_CONFIG.Fireball.scoreValue
-        : spellName === 'Lightning'
-          ? SPELL_CONFIG.Lightning.scoreValue
-          : 10;
+    const scoreValue = SPELL_CONFIG[spellName]?.scoreValue ?? 10;
+    const burstColor =
+      spellName === 'Lightning'
+        ? '250 204 21'
+        : spellName === 'Fireball'
+          ? '251 146 60'
+          : spellName === 'Freeze'
+            ? '191 219 254'
+            : '110 231 249';
 
     state.score += scoreValue;
     state.defeatedEnemies += 1;
@@ -257,7 +232,7 @@ export function createGame({
       createRingEffect({
         x: enemy.x,
         y: getEnemyY(enemy, now),
-        color: '110 231 249',
+        color: burstColor,
         maxRadius: enemy.radius * 2.4,
         lifeMs: 420,
         lineWidth: 3,
@@ -267,12 +242,7 @@ export function createGame({
       ...createBurstParticles({
         x: enemy.x,
         y: getEnemyY(enemy, now),
-        color:
-          spellName === 'Lightning'
-            ? '250 204 21'
-            : spellName === 'Fireball'
-              ? '251 146 60'
-              : '110 231 249',
+        color: burstColor,
         count: 20,
         minSpeed: 60,
         maxSpeed: 230,
@@ -327,13 +297,13 @@ export function createGame({
         ...createBurstParticles({
           x: projectile.x,
           y: projectile.y,
-          color: projectile.color,
-          count: 1,
-          minSpeed: 8,
-          maxSpeed: 26,
+          color: projectile.spellName === 'Freeze' ? '224 242 254' : projectile.color,
+          count: projectile.spellName === 'Freeze' ? 2 : 1,
+          minSpeed: projectile.spellName === 'Freeze' ? 10 : 8,
+          maxSpeed: projectile.spellName === 'Freeze' ? 34 : 26,
           minRadius: 1,
-          maxRadius: 3,
-          lifeMs: 220,
+          maxRadius: projectile.spellName === 'Freeze' ? 4 : 3,
+          lifeMs: projectile.spellName === 'Freeze' ? 260 : 220,
         }),
       );
 
@@ -359,30 +329,44 @@ export function createGame({
       hitEnemy.hp -= projectile.damage;
       hitEnemy.hitFlash = 1;
       hitEnemy.hitFlashMs = 180;
+      const impactRingColor = projectile.spellName === 'Freeze' ? '191 219 254' : '251 146 60';
+      const impactBurstColor = projectile.spellName === 'Freeze' ? '224 242 254' : '251 146 60';
       state.rings.push(
         createRingEffect({
           x: hitEnemy.x,
           y: getEnemyY(hitEnemy, now),
-          color: '251 146 60',
+          color: impactRingColor,
           maxRadius: hitEnemy.radius * 1.8,
-          lifeMs: 260,
-          lineWidth: 2,
+          lifeMs: projectile.spellName === 'Freeze' ? 340 : 260,
+          lineWidth: projectile.spellName === 'Freeze' ? 3 : 2,
         }),
       );
+      if (projectile.spellName === 'Freeze') {
+        state.rings.push(
+          createRingEffect({
+            x: hitEnemy.x,
+            y: getEnemyY(hitEnemy, now),
+            color: '103 232 249',
+            maxRadius: hitEnemy.radius * 2.2,
+            lifeMs: 420,
+            lineWidth: 2,
+          }),
+        );
+      }
       state.particles.push(
         ...createBurstParticles({
           x: hitEnemy.x,
           y: getEnemyY(hitEnemy, now),
-          color: '251 146 60',
-          count: 18,
+          color: impactBurstColor,
+          count: projectile.spellName === 'Freeze' ? 22 : 18,
           minSpeed: 50,
-          maxSpeed: 180,
-          lifeMs: 380,
+          maxSpeed: projectile.spellName === 'Freeze' ? 160 : 180,
+          lifeMs: projectile.spellName === 'Freeze' ? 460 : 380,
         }),
       );
 
       if (hitEnemy.hp <= 0) {
-        defeatEnemy(hitEnemy, now, 'Fireball');
+        defeatEnemy(hitEnemy, now, projectile.spellName ?? 'Fireball');
         state.enemies = state.enemies.filter((enemy) => enemy.id !== hitEnemy.id);
       }
 
@@ -391,6 +375,7 @@ export function createGame({
   }
 
   function updateEffects(deltaSeconds) {
+    state.player.freezeCastMs = Math.max(0, state.player.freezeCastMs - deltaSeconds * 1000);
     state.player.healPulseMs = Math.max(0, state.player.healPulseMs - deltaSeconds * 1000);
     state.player.damageFlashMs = Math.max(0, state.player.damageFlashMs - deltaSeconds * 1000);
 
@@ -419,11 +404,11 @@ export function createGame({
   }
 
   function getSnapshot(now = performance.now()) {
-    const shieldRemainingMs = Math.max(0, state.player.blockUntil - now);
+    const freezeRemainingMs = state.player.freezeCastMs;
     const gameStateLabel = state.gameOver
       ? 'Game over'
-      : shieldRemainingMs > 0
-        ? 'Ward active'
+      : freezeRemainingMs > 0
+        ? 'Freeze cast'
         : state.enemies.length > 0
           ? 'Battle running'
           : 'Lane secure';
@@ -434,8 +419,8 @@ export function createGame({
       score: state.score,
       defeatedEnemies: state.defeatedEnemies,
       enemiesAlive: state.enemies.length,
-      shieldRemainingMs,
-      shieldActive: shieldRemainingMs > 0,
+      freezeRemainingMs,
+      freezeActive: freezeRemainingMs > 0,
       gameOver: state.gameOver,
       gameStateLabel,
       feedText: state.feedText,
@@ -521,7 +506,8 @@ export function createGame({
 
   function renderPlayer(now) {
     const { player } = state;
-    const shieldRemainingMs = Math.max(0, player.blockUntil - now);
+    const freezeStrength =
+      player.freezeCastMs > 0 ? player.freezeCastMs / SPELL_CONFIG.Freeze.castPulseMs : 0;
     const healStrength = player.healPulseMs > 0 ? player.healPulseMs / SPELL_CONFIG.Heal.pulseDurationMs : 0;
     const damageStrength = player.damageFlashMs > 0 ? player.damageFlashMs / 240 : 0;
 
@@ -530,16 +516,13 @@ export function createGame({
     context.ellipse(player.x, layout.floorY - 6, 52, 14, 0, 0, Math.PI * 2);
     context.fill();
 
-    if (shieldRemainingMs > 0) {
-      context.strokeStyle = rgbaFromRgbString(
-        '56 189 248',
-        0.4 + shieldRemainingMs / SPELL_CONFIG.Block.durationMs * 0.35,
-      );
-      context.lineWidth = 4;
-      context.shadowColor = rgbaFromRgbString('56 189 248', 0.28);
-      context.shadowBlur = 24;
+    if (freezeStrength > 0) {
+      context.strokeStyle = rgbaFromRgbString('191 219 254', 0.24 + freezeStrength * 0.38);
+      context.lineWidth = 3;
+      context.shadowColor = rgbaFromRgbString('103 232 249', 0.3);
+      context.shadowBlur = 18;
       context.beginPath();
-      context.ellipse(player.x + 6, player.y - 4, 50, 66, 0, 0, Math.PI * 2);
+      context.arc(player.x + 22, player.y - 60, 28 + freezeStrength * 10, -1.2, 0.8);
       context.stroke();
       context.shadowBlur = 0;
     }
@@ -575,7 +558,7 @@ export function createGame({
     context.stroke();
 
     const orbGlow = context.createRadialGradient(player.x + 34, player.y - 78, 0, player.x + 34, player.y - 78, 16);
-    orbGlow.addColorStop(0, healStrength > 0 ? '#86efac' : '#f8fafc');
+    orbGlow.addColorStop(0, healStrength > 0 ? '#86efac' : freezeStrength > 0 ? '#e0f2fe' : '#f8fafc');
     orbGlow.addColorStop(1, 'rgba(248, 250, 252, 0)');
     context.fillStyle = orbGlow;
     context.beginPath();
@@ -632,6 +615,51 @@ export function createGame({
   }
 
   function renderProjectile(projectile) {
+    if (projectile.spellName === 'Freeze') {
+      const gradient = context.createRadialGradient(
+        projectile.x,
+        projectile.y,
+        0,
+        projectile.x,
+        projectile.y,
+        projectile.radius * 2.5,
+      );
+      gradient.addColorStop(0, '#f8fdff');
+      gradient.addColorStop(0.42, '#bfdbfe');
+      gradient.addColorStop(1, 'rgba(191, 219, 254, 0)');
+      context.fillStyle = gradient;
+      context.beginPath();
+      context.arc(projectile.x, projectile.y, projectile.radius * 2.5, 0, Math.PI * 2);
+      context.fill();
+
+      const angle = Math.atan2(projectile.vy, projectile.vx);
+      const tailLength = projectile.radius * 2.2;
+      context.strokeStyle = rgbaFromRgbString('191 219 254', 0.72);
+      context.lineWidth = 3;
+      context.beginPath();
+      context.moveTo(projectile.x, projectile.y);
+      context.lineTo(
+        projectile.x - Math.cos(angle) * tailLength,
+        projectile.y - Math.sin(angle) * tailLength,
+      );
+      context.stroke();
+
+      context.fillStyle = '#e0f2fe';
+      context.beginPath();
+      context.moveTo(projectile.x + Math.cos(angle) * projectile.radius, projectile.y + Math.sin(angle) * projectile.radius);
+      context.lineTo(
+        projectile.x - Math.cos(angle) * projectile.radius * 0.7 + Math.sin(angle) * 4,
+        projectile.y - Math.sin(angle) * projectile.radius * 0.7 - Math.cos(angle) * 4,
+      );
+      context.lineTo(
+        projectile.x - Math.cos(angle) * projectile.radius * 0.7 - Math.sin(angle) * 4,
+        projectile.y - Math.sin(angle) * projectile.radius * 0.7 + Math.cos(angle) * 4,
+      );
+      context.closePath();
+      context.fill();
+      return;
+    }
+
     const gradient = context.createRadialGradient(
       projectile.x,
       projectile.y,

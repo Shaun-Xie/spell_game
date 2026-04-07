@@ -17,9 +17,13 @@ export const SPELL_CONFIG = {
     amount: 20,
     pulseDurationMs: 720,
   },
-  Block: {
-    durationMs: 1800,
-    mitigation: 0.78,
+  Freeze: {
+    damage: 14,
+    projectileSpeed: 560,
+    projectileRadius: 11,
+    projectileLifeMs: 1700,
+    castPulseMs: 680,
+    scoreValue: 11,
   },
 };
 
@@ -240,35 +244,73 @@ function castHeal(state, now) {
   };
 }
 
-function castBlock(state, now) {
-  const { Block } = SPELL_CONFIG;
-  state.player.blockUntil = Math.max(state.player.blockUntil, now + Block.durationMs);
+function castFreeze(state, now, width) {
+  const { Freeze } = SPELL_CONFIG;
+  const target = getNearestEnemy(state);
+  const origin = {
+    x: state.player.x + state.player.radius * 1.45,
+    y: state.player.y - 20,
+  };
+  const destination = target
+    ? { x: target.x, y: target.y - 4 }
+    : { x: width * 0.92, y: state.player.y - 26 };
+  const dx = destination.x - origin.x;
+  const dy = destination.y - origin.y;
+  const distance = Math.hypot(dx, dy) || 1;
+
+  state.player.freezeCastMs = Freeze.castPulseMs;
+  state.projectiles.push({
+    id: state.nextProjectileId++,
+    spellName: 'Freeze',
+    x: origin.x,
+    y: origin.y,
+    vx: (dx / distance) * Freeze.projectileSpeed,
+    vy: (dy / distance) * Freeze.projectileSpeed,
+    radius: Freeze.projectileRadius,
+    damage: Freeze.damage,
+    color: '191 219 254',
+    life: Freeze.projectileLifeMs,
+    maxLife: Freeze.projectileLifeMs,
+  });
   state.rings.push(
     createRingEffect({
-      x: state.player.x,
-      y: state.player.y,
-      color: '56 189 248',
-      maxRadius: state.player.radius * 2.3,
-      lifeMs: 620,
+      x: origin.x,
+      y: origin.y,
+      color: '191 219 254',
+      maxRadius: state.player.radius * 1.9,
+      lifeMs: 420,
       lineWidth: 3,
     }),
   );
   state.particles.push(
     ...createBurstParticles({
-      x: state.player.x,
-      y: state.player.y,
-      color: '56 189 248',
-      count: 12,
-      minSpeed: 28,
-      maxSpeed: 90,
+      x: origin.x,
+      y: origin.y,
+      color: '224 242 254',
+      count: 14,
+      minSpeed: 24,
+      maxSpeed: 110,
+      lifeMs: 520,
+    }),
+    ...createBurstParticles({
+      x: origin.x,
+      y: origin.y,
+      color: '103 232 249',
+      count: 8,
+      minSpeed: 20,
+      maxSpeed: 74,
+      minRadius: 1,
+      maxRadius: 3,
       lifeMs: 460,
     }),
   );
 
   return {
     accepted: true,
-    headline: 'Barrier ward raised',
-    detail: 'Incoming damage is heavily reduced for a short time.',
+    headline: 'Freeze cast',
+    detail: target
+      ? 'A frost shard streaks toward the nearest enemy.'
+      : 'A cold shard tears down the lane and leaves a brief chill shimmer.',
   };
 }
 
@@ -293,8 +335,8 @@ export function applySpellCast(state, spellName, { now, width }) {
     return castHeal(state, now);
   }
 
-  if (spellName === 'Block') {
-    return castBlock(state, now);
+  if (spellName === 'Freeze') {
+    return castFreeze(state, now, width);
   }
 
   return {

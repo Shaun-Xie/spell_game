@@ -14,7 +14,7 @@ Mage Hands is a browser-based spellcasting battle demo built with Vite, vanilla 
 - `Closed fist` -> `Fireball`
 - `Index finger only` -> `Lightning`
 - `Index + middle fingers` -> `Heal`
-- `Thumbs up` -> `Block`
+- `Thumbs up` -> `Freeze`
 
 If no mapped pose is held steadily enough, the HUD shows `No spell`.
 
@@ -25,7 +25,7 @@ If no mapped pose is held steadily enough, the HUD shows `No spell`.
 - `Fireball` launches a glowing projectile that travels toward the nearest enemy.
 - `Lightning` instantly strikes the nearest enemy with a beam.
 - `Heal` restores player HP and plays a healing pulse around the mage.
-- `Block` raises a temporary ward that reduces incoming damage.
+- `Freeze` launches an icy shard with frost burst feedback on hit. It is a visual/control spell identity for now and does not slow enemies yet.
 - Score increases when enemies are defeated.
 - The battle ends when player HP reaches `0`.
 - Use the on-screen restart button or press `R` / `Enter` after game over to reset the fight.
@@ -93,8 +93,8 @@ Main gameplay tuning points:
 - Player HP: `src/game.js` inside `GAME_SETTINGS.playerMaxHp`
 - Spawn behavior: `src/game.js` inside `GAME_SETTINGS.maxActiveEnemies`, `spawnIntervalMinMs`, and `spawnIntervalMaxMs`
 - Contact damage: `src/game.js` inside `GAME_SETTINGS.enemyContactDamage`
-- Fireball / lightning / heal / block numbers: `src/spells.js` inside `SPELL_CONFIG`
-- Block duration: `src/spells.js` inside `SPELL_CONFIG.Block.durationMs`
+- Fireball / lightning / heal / freeze numbers: `src/spells.js` inside `SPELL_CONFIG`
+- Freeze cast pulse and projectile tuning: `src/spells.js` inside `SPELL_CONFIG.Freeze`
 - Projectile speed: `src/spells.js` inside `SPELL_CONFIG.Fireball.projectileSpeed`
 
 Gesture tuning points:

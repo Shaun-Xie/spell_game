@@ -116,10 +116,10 @@
                     <p class="arena-stat__label">Enemies</p>
                     <p id="arenaEnemiesValue" class="arena-stat__value">0</p>
                   </div>
-                  <div class="arena-stat">
-                    <p class="arena-stat__label">Ward</p>
-                    <p id="arenaWardValue" class="arena-stat__value">Offline</p>
-                  </div>
+                <div class="arena-stat">
+                  <p class="arena-stat__label">Freeze</p>
+                  <p id="arenaFreezeValue" class="arena-stat__value">Idle</p>
+                </div>
                 </div>
 
                 <div class="pointer-events-none absolute inset-x-4 bottom-4 z-20 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -301,8 +301,8 @@
                   <dd id="playerHpText" class="status-row__value">100 / 100</dd>
                 </div>
                 <div class="status-row">
-                  <dt class="status-row__label">Ward</dt>
-                  <dd id="wardStatusText" class="status-row__value">Ward offline</dd>
+                  <dt class="status-row__label">Freeze Echo</dt>
+                  <dd id="freezeStatusText" class="status-row__value">Idle</dd>
                 </div>
                 <div class="status-row">
                   <dt class="status-row__label">Enemies Alive</dt>
@@ -346,11 +346,11 @@
                     <p id="spellCardFireballHint" class="spell-card__hint">Closed fist</p>
                   </div>
                 </article>
-                <article class="spell-card spell-card--block">
-                  <div class="spell-card__icon"><i data-lucide="shield" class="h-5 w-5"></i></div>
+                <article class="spell-card spell-card--freeze">
+                  <div class="spell-card__icon"><i data-lucide="snowflake" class="h-5 w-5"></i></div>
                   <div>
-                    <p id="spellCardBlockTitle" class="spell-card__title">Block</p>
-                    <p id="spellCardBlockHint" class="spell-card__hint">Thumbs up</p>
+                    <p id="spellCardFreezeTitle" class="spell-card__title">Freeze</p>
+                    <p id="spellCardFreezeHint" class="spell-card__hint">Thumbs up</p>
                   </div>
                 </article>
                 <article class="spell-card spell-card--lightning">
