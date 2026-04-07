@@ -19,6 +19,23 @@ export function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+export function rgbaFromRgbString(rgb, alpha = 1) {
+  const normalizedAlpha = clamp(alpha, 0, 1);
+  const channels = `${rgb ?? ''}`
+    .trim()
+    .split(/[,\s]+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((value) => Number(value));
+
+  if (channels.length !== 3 || channels.some((value) => Number.isNaN(value))) {
+    return `rgba(255, 255, 255, ${normalizedAlpha})`;
+  }
+
+  const [red, green, blue] = channels;
+  return `rgba(${red}, ${green}, ${blue}, ${normalizedAlpha})`;
+}
+
 export function lerp(start, end, amount) {
   return start + (end - start) * amount;
 }

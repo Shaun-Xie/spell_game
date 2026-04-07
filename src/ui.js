@@ -19,7 +19,14 @@ import {
 import { animate, stagger } from 'motion';
 import { Howl } from 'howler';
 import { GESTURE_MODE_LABEL } from './gestureClassifier.js';
-import { HAND_CONNECTIONS, SPELL_THEME, createToneDataUri, formatDuration, timeStampLabel } from './utils.js';
+import {
+  HAND_CONNECTIONS,
+  SPELL_THEME,
+  createToneDataUri,
+  formatDuration,
+  rgbaFromRgbString,
+  timeStampLabel,
+} from './utils.js';
 
 const STATUS_BADGE_CLASS_MAP = {
   idle: 'status-badge status-badge--idle',
@@ -388,9 +395,9 @@ export function createUI() {
     const scale = Math.max(0.8, Math.min(contentWidth / 960, 1.05));
 
     overlayContext.lineWidth = 2.05 * scale;
-    overlayContext.strokeStyle = `rgba(${theme.rgb}, 0.82)`;
-    overlayContext.fillStyle = `rgba(${theme.rgb}, 0.94)`;
-    overlayContext.shadowColor = `rgba(${theme.rgb}, 0.34)`;
+    overlayContext.strokeStyle = rgbaFromRgbString(theme.rgb, 0.82);
+    overlayContext.fillStyle = rgbaFromRgbString(theme.rgb, 0.94);
+    overlayContext.shadowColor = rgbaFromRgbString(theme.rgb, 0.34);
     overlayContext.shadowBlur = 15 * scale;
 
     HAND_CONNECTIONS.forEach(([startIndex, endIndex]) => {

@@ -1,4 +1,4 @@
-import { clamp, randomRange } from './utils.js';
+import { clamp, randomRange, rgbaFromRgbString } from './utils.js';
 import {
   SPELL_CONFIG,
   applySpellCast,
@@ -46,10 +46,6 @@ function createResizeBinding(target, callback) {
       window.removeEventListener('resize', callback);
     },
   };
-}
-
-function rgba(rgb, alpha) {
-  return `rgba(${rgb}, ${alpha})`;
 }
 
 function createInitialState() {
@@ -462,8 +458,8 @@ export function createGame({
       layout.playerY - 30,
       viewportWidth * 0.32,
     );
-    playerGlow.addColorStop(0, rgba('56 189 248', 0.18));
-    playerGlow.addColorStop(1, rgba('56 189 248', 0));
+    playerGlow.addColorStop(0, rgbaFromRgbString('56 189 248', 0.18));
+    playerGlow.addColorStop(1, rgbaFromRgbString('56 189 248', 0));
     context.fillStyle = playerGlow;
     context.fillRect(0, 0, viewportWidth, viewportHeight);
 
@@ -475,8 +471,8 @@ export function createGame({
       layout.playerY,
       viewportWidth * 0.24,
     );
-    gateGlow.addColorStop(0, rgba('251 146 60', 0.14));
-    gateGlow.addColorStop(1, rgba('251 146 60', 0));
+    gateGlow.addColorStop(0, rgbaFromRgbString('251 146 60', 0.14));
+    gateGlow.addColorStop(1, rgbaFromRgbString('251 146 60', 0));
     context.fillStyle = gateGlow;
     context.fillRect(0, 0, viewportWidth, viewportHeight);
 
@@ -489,7 +485,7 @@ export function createGame({
       context.fill();
     }
 
-    context.strokeStyle = rgba('148 163 184', 0.14);
+    context.strokeStyle = rgbaFromRgbString('148 163 184', 0.14);
     context.lineWidth = 1;
     layout.laneYs.forEach((laneY, laneIndex) => {
       context.beginPath();
@@ -503,13 +499,13 @@ export function createGame({
     context.ellipse(layout.playerX, layout.floorY, 120, 20, 0, 0, Math.PI * 2);
     context.fill();
 
-    context.strokeStyle = rgba('110 231 249', 0.2);
+    context.strokeStyle = rgbaFromRgbString('110 231 249', 0.2);
     context.lineWidth = 2;
     context.beginPath();
     context.arc(layout.playerX, layout.playerY, 52, 0, Math.PI * 2);
     context.stroke();
 
-    context.strokeStyle = rgba('251 146 60', 0.18);
+    context.strokeStyle = rgbaFromRgbString('251 146 60', 0.18);
     context.lineWidth = 2;
     context.beginPath();
     context.ellipse(viewportWidth * 0.91, layout.playerY, 42, 92, 0, 0, Math.PI * 2);
@@ -535,9 +531,12 @@ export function createGame({
     context.fill();
 
     if (shieldRemainingMs > 0) {
-      context.strokeStyle = rgba('56 189 248', 0.4 + shieldRemainingMs / SPELL_CONFIG.Block.durationMs * 0.35);
+      context.strokeStyle = rgbaFromRgbString(
+        '56 189 248',
+        0.4 + shieldRemainingMs / SPELL_CONFIG.Block.durationMs * 0.35,
+      );
       context.lineWidth = 4;
-      context.shadowColor = rgba('56 189 248', 0.28);
+      context.shadowColor = rgbaFromRgbString('56 189 248', 0.28);
       context.shadowBlur = 24;
       context.beginPath();
       context.ellipse(player.x + 6, player.y - 4, 50, 66, 0, 0, Math.PI * 2);
@@ -556,7 +555,9 @@ export function createGame({
     context.closePath();
     context.fill();
 
-    context.fillStyle = healStrength > 0 ? rgba('52 211 153', 0.38) : 'rgba(110, 231, 249, 0.15)';
+    context.fillStyle = healStrength > 0
+      ? rgbaFromRgbString('52 211 153', 0.38)
+      : 'rgba(110, 231, 249, 0.15)';
     context.beginPath();
     context.arc(player.x - 2, player.y - 58, 18, 0, Math.PI * 2);
     context.fill();
@@ -593,14 +594,14 @@ export function createGame({
     context.fill();
 
     const glow = context.createRadialGradient(enemy.x, y, 0, enemy.x, y, enemy.radius * 2.2);
-    glow.addColorStop(0, rgba('248 113 113', 0.42));
-    glow.addColorStop(1, rgba('248 113 113', 0));
+    glow.addColorStop(0, rgbaFromRgbString('248 113 113', 0.42));
+    glow.addColorStop(1, rgbaFromRgbString('248 113 113', 0));
     context.fillStyle = glow;
     context.beginPath();
     context.arc(enemy.x, y, enemy.radius * 2.2, 0, Math.PI * 2);
     context.fill();
 
-    context.fillStyle = enemy.spawnFlashMs > 0 ? rgba('251 191 36', 0.34) : '#1f2937';
+    context.fillStyle = enemy.spawnFlashMs > 0 ? rgbaFromRgbString('251 191 36', 0.34) : '#1f2937';
     context.beginPath();
     context.moveTo(enemy.x, y - enemy.radius);
     context.lineTo(enemy.x + enemy.radius * 0.9, y);
@@ -609,7 +610,9 @@ export function createGame({
     context.closePath();
     context.fill();
 
-    context.fillStyle = enemy.hitFlash > 0 ? rgba('255 255 255', 0.66 * enemy.hitFlash) : '#f87171';
+    context.fillStyle = enemy.hitFlash > 0
+      ? rgbaFromRgbString('255 255 255', 0.66 * enemy.hitFlash)
+      : '#f87171';
     context.beginPath();
     context.arc(enemy.x, y, enemy.radius * 0.52, 0, Math.PI * 2);
     context.fill();
@@ -648,7 +651,7 @@ export function createGame({
 
   function renderRing(ring) {
     const progress = 1 - ring.life / ring.maxLife;
-    context.strokeStyle = rgba(ring.color, 0.46 * (1 - progress));
+    context.strokeStyle = rgbaFromRgbString(ring.color, 0.46 * (1 - progress));
     context.lineWidth = ring.lineWidth;
     context.beginPath();
     context.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
@@ -657,7 +660,7 @@ export function createGame({
 
   function renderBeam(beam) {
     const intensity = beam.life / beam.maxLife;
-    context.strokeStyle = rgba(beam.color, 0.18 * intensity);
+    context.strokeStyle = rgbaFromRgbString(beam.color, 0.18 * intensity);
     context.lineWidth = 14;
     context.lineJoin = 'round';
     context.lineCap = 'round';
@@ -671,7 +674,7 @@ export function createGame({
     });
     context.stroke();
 
-    context.strokeStyle = rgba(beam.color, 0.9 * intensity);
+    context.strokeStyle = rgbaFromRgbString(beam.color, 0.9 * intensity);
     context.lineWidth = 4;
     context.beginPath();
     beam.points.forEach((point, index) => {
@@ -686,7 +689,7 @@ export function createGame({
 
   function renderParticle(particle) {
     const alpha = particle.life / particle.maxLife;
-    context.fillStyle = rgba(particle.color, alpha);
+    context.fillStyle = rgbaFromRgbString(particle.color, alpha);
     context.beginPath();
     context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
     context.fill();
