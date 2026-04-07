@@ -16,6 +16,20 @@ let cameraReady = false;
 let gameReady = false;
 let lastRawGesture = 'NO_INPUT';
 let handPreviouslyVisible = false;
+let modelInitTask = null;
+let cameraInitTask = null;
+let listenersBound = false;
+let startupNoticeDelayId = null;
+let startupNoticeEscalationId = null;
+
+const startupPhases = {
+  boot: { status: 'idle', detail: '' },
+  ui: { status: 'idle', detail: '' },
+  game: { status: 'idle', detail: '' },
+  model: { status: 'idle', detail: '' },
+  camera: { status: 'idle', detail: '' },
+  tracking: { status: 'idle', detail: '' },
+};
 
 const STATUS_BADGE_CLASS_MAP = {
   idle: 'status-badge status-badge--idle',
@@ -107,6 +121,141 @@ function pushStartupMessage(message, level = 'info') {
 
 function logStartupPhase(phase, message, level = 'info') {
   pushStartupMessage(`Startup phase [${phase}]: ${message}`, level);
+}
+
+function getDiagnosticMessage() {
+  if (startupPhases.tracking.status === 'error') {
+    return startupPhases.tracking.detail;
+  }
+
+  if (startupPhases.camera.status === 'error' && startupPhases.model.status === 'error') {
+    return 'Camera and tracker are unavailable. The battle lane is still running, but spellcasting is offline.';
+  }
+
+  if (startupPhases.camera.status === 'error') {
+    return startupPhases.camera.detail;
+  }
+
+  if (startupPhases.model.status === 'error') {
+    return startupPhases.model.detail;
+  }
+
+  if (startupPhases.tracking.status === 'active') {
+    return startupPhases.tracking.detail;
+  }
+
+  if (startupPhases.camera.status === 'loading' && startupPhases.model.status === 'loading') {
+    return 'Waiting for webcam permission and loading the hand tracker.';
+  }
+
+  if (startupPhases.camera.status === 'loading') {
+    return startupPhases.camera.detail;
+  }
+
+  if (startupPhases.model.status === 'loading') {
+    return startupPhases.model.detail;
+  }
+
+  if (startupPhases.game.status === 'ready' && startupPhases.tracking.status !== 'active') {
+    return 'Battle lane ready. Spellcasting systems are still starting.';
+  }
+
+  return startupPhases.boot.detail || 'Boot sequence started.';
+}
+
+function refreshDiagnosticStatus() {
+  const message = getDiagnosticMessage();
+
+  if (ui) {
+    ui.setDebugMessage(message);
+  } else {
+    setDomText('debugMessageText', message);
+  }
+}
+
+function setStartupPhase(
+  phase,
+  status,
+  detail,
+  { level = status === 'error' ? 'error' : 'info', pushLog = false } = {},
+) {
+  startupPhases[phase] = { status, detail };
+  console[level]?.(`[Mage Hands] Startup phase [${phase}] ${status}: ${detail}`);
+
+  if (pushLog && ui) {
+    ui.pushDebugMessage(`Startup phase [${phase}] ${status}: ${detail}`);
+  }
+
+  refreshDiagnosticStatus();
+}
+
+function clearStartupNoticeTimers() {
+  if (startupNoticeDelayId) {
+    window.clearTimeout(startupNoticeDelayId);
+    startupNoticeDelayId = null;
+  }
+
+  if (startupNoticeEscalationId) {
+    window.clearTimeout(startupNoticeEscalationId);
+    startupNoticeEscalationId = null;
+  }
+}
+
+function updatePendingStartupNotice() {
+  if (!ui) {
+    return;
+  }
+
+  const cameraLoading = startupPhases.camera.status === 'loading';
+  const modelLoading = startupPhases.model.status === 'loading';
+  const trackingActive = startupPhases.tracking.status === 'active';
+  const hasError =
+    startupPhases.camera.status === 'error' ||
+    startupPhases.model.status === 'error' ||
+    startupPhases.tracking.status === 'error';
+
+  if (trackingActive || hasError || (!cameraLoading && !modelLoading)) {
+    return;
+  }
+
+  let title = 'Starting spellcasting systems';
+  let hint = 'Waiting for webcam permission and loading the hand tracker.';
+
+  if (cameraLoading && modelLoading) {
+    title = 'Spellcasting systems still starting';
+    hint = 'The battle lane is already running. Finish the webcam prompt and give the hand tracker a moment to load.';
+  } else if (cameraLoading) {
+    title = 'Waiting for camera permission';
+    hint = 'The battle lane is already running. Allow webcam access to bring spellcasting online.';
+  } else if (modelLoading) {
+    title = 'Loading hand tracker';
+    hint = 'The battle lane is already running. Spellcasting will come online when the tracker finishes loading.';
+  }
+
+  ui.setStageNotice({
+    title,
+    hint,
+    tone: 'neutral',
+    hidden: false,
+    showRetry: true,
+  });
+}
+
+function scheduleStartupNoticeTimers() {
+  clearStartupNoticeTimers();
+
+  startupNoticeDelayId = window.setTimeout(() => {
+    updatePendingStartupNotice();
+  }, 900);
+
+  startupNoticeEscalationId = window.setTimeout(() => {
+    if (!ui) {
+      return;
+    }
+
+    updatePendingStartupNotice();
+    ui.pushDebugMessage('Startup is taking longer than expected. Retry is available while camera/model loading continues.');
+  }, 3200);
 }
 
 function describeCameraError(error) {
@@ -228,14 +377,13 @@ function updateStageNoticeForState(state) {
 
 function summarizeStartup(modelResult, cameraResult) {
   if (modelResult.ok && cameraResult.ok) {
-    ui.setDebugMessage('Startup complete. Camera, tracker, and battle lane are live.');
     ui.pushDebugMessage('Startup complete. Camera, tracker, and battle lane are live.');
+    refreshDiagnosticStatus();
     return;
   }
 
   if (!modelResult.ok && !cameraResult.ok) {
     ui.setHandStatus('error', 'Startup blocked');
-    ui.setDebugMessage('Camera and tracker both failed. The battle lane is running, but spellcasting is offline.');
     ui.pushDebugMessage('Startup incomplete: camera and tracker are both unavailable.');
     ui.setStageNotice({
       title: 'Spellcasting offline',
@@ -244,25 +392,27 @@ function summarizeStartup(modelResult, cameraResult) {
       hidden: false,
       showRetry: true,
     });
+    refreshDiagnosticStatus();
     return;
   }
 
   if (!cameraResult.ok) {
     ui.setHandStatus('error', 'Camera unavailable');
-    ui.setDebugMessage('The battle lane is running, but webcam access failed. Fix camera access, then retry.');
     ui.pushDebugMessage('Startup incomplete: webcam access failed.');
+    refreshDiagnosticStatus();
     return;
   }
 
   ui.setHandStatus('error', 'Tracker unavailable');
-  ui.setDebugMessage('The battle lane is running, but hand tracking failed. Retry after the model finishes loading normally.');
   ui.pushDebugMessage('Startup incomplete: hand-tracker initialization failed.');
+  refreshDiagnosticStatus();
 }
 
 function handleTrackingRuntimeFailure(error) {
   const message = describeTrackingRuntimeError(error);
 
   stopRenderLoop();
+  clearStartupNoticeTimers();
   handPreviouslyVisible = false;
   lastRawGesture = 'NO_INPUT';
   modelReady = false;
@@ -270,6 +420,9 @@ function handleTrackingRuntimeFailure(error) {
   handTracker?.dispose?.();
   handTracker = null;
   gestureController = createGestureController();
+  modelInitTask = null;
+  setStartupPhase('tracking', 'error', message, { pushLog: true });
+  setStartupPhase('model', 'error', 'Tracking crashed. Retry to reload the hand tracker.', { pushLog: false });
 
   if (!ui) {
     showEmergencyStartupError('Tracking runtime failed', message, { showRetry: true });
@@ -309,7 +462,7 @@ function startTrackingLoop() {
     showRetry: false,
   });
   ui.setHandStatus('ready', 'Tracking online');
-  ui.setDebugMessage('Tracking loop active. Waiting for live video frames.');
+  setStartupPhase('tracking', 'active', 'Tracking online. Waiting for live video frames.', { pushLog: true });
   ui.pushDebugMessage('Tracking loop started.');
 
   const renderLoop = (timestamp) => {
@@ -372,16 +525,19 @@ function startTrackingLoop() {
 
 function createSubsystems() {
   try {
+    setStartupPhase('ui', 'loading', 'Creating the interface shell.');
     logStartupPhase('ui', 'Creating the interface shell.');
     ui = createUI();
     ui.setGestureMode();
-    ui.pushDebugMessage('Startup phase [ui]: interface shell ready.');
+    setStartupPhase('ui', 'ready', 'Interface shell ready.', { pushLog: true });
+    bindGlobalListeners();
   } catch (error) {
     showEmergencyStartupError('UI startup failed', describeUiError(error), { showRetry: false });
     throw error;
   }
 
   try {
+    setStartupPhase('game', 'loading', 'Creating the battle lane and gesture systems.');
     logStartupPhase('game', 'Creating the battle lane and gesture systems.');
     gestureController = createGestureController();
     handTracker = createHandTracker();
@@ -391,12 +547,11 @@ function createSubsystems() {
         ui.renderGameState(state);
       },
       onBattleEvent: (message) => {
-        ui.setDebugMessage(message);
-        ui.pushDebugMessage(message);
+        ui.pushDebugMessage(`[Battle] ${message}`);
       },
     });
     gameReady = true;
-    ui.pushDebugMessage('Startup phase [game]: battle lane ready.');
+    setStartupPhase('game', 'ready', 'Battle lane ready.', { pushLog: true });
   } catch (error) {
     const message = error?.name?.startsWith('Game')
       ? describeGameError(error)
@@ -416,64 +571,95 @@ function createSubsystems() {
 }
 
 async function initializeModel() {
-  ui.setModelStatus('loading', 'Loading model');
-  ui.pushDebugMessage('Startup phase [model]: loading the Hand Landmarker.');
-  console.info('[Mage Hands] Loading Hand Landmarker...');
-
-  try {
-    await handTracker.init();
-    modelReady = true;
-    ui.setModelStatus('ready', 'Model online');
-    ui.pushDebugMessage('MediaPipe Hand Landmarker loaded successfully.');
-    console.info('[Mage Hands] Hand Landmarker ready.');
+  if (modelReady) {
     return { ok: true };
-  } catch (error) {
-    modelReady = false;
-    ui.setModelStatus('error', 'Model error');
-    ui.setDebugMessage(describeModelError(error));
-    ui.pushDebugMessage(describeModelError(error));
-    ui.setStageNotice({
-      title: 'Tracking model unavailable',
-      hint: describeModelError(error),
-      tone: 'error',
-      hidden: false,
-      showRetry: true,
-    });
-    console.error('[Mage Hands] Failed to load Hand Landmarker.', error);
-    return { ok: false, error };
   }
+
+  if (modelInitTask) {
+    return modelInitTask;
+  }
+
+  modelInitTask = (async () => {
+    ui.setModelStatus('loading', 'Loading model');
+    setStartupPhase('model', 'loading', 'Loading the hand tracker model...', { pushLog: true });
+    scheduleStartupNoticeTimers();
+
+    try {
+      await handTracker.init();
+      modelReady = true;
+      ui.setModelStatus('ready', 'Model online');
+      ui.pushDebugMessage('MediaPipe Hand Landmarker loaded successfully.');
+      setStartupPhase('model', 'ready', 'Hand tracker model ready.');
+      updatePendingStartupNotice();
+      console.info('[Mage Hands] Hand Landmarker ready.');
+      return { ok: true };
+    } catch (error) {
+      modelReady = false;
+      ui.setModelStatus('error', 'Model error');
+      setStartupPhase('model', 'error', describeModelError(error), { pushLog: true });
+      ui.setStageNotice({
+        title: 'Tracking model unavailable',
+        hint: describeModelError(error),
+        tone: 'error',
+        hidden: false,
+        showRetry: true,
+      });
+      console.error('[Mage Hands] Failed to load Hand Landmarker.', error);
+      return { ok: false, error };
+    } finally {
+      modelInitTask = null;
+    }
+  })();
+
+  return modelInitTask;
 }
 
 async function initializeCamera() {
-  ui.setCameraStatus('loading', 'Requesting camera');
-  ui.pushDebugMessage('Startup phase [camera]: requesting webcam access.');
-  console.info('[Mage Hands] Requesting webcam access...');
-
-  try {
-    cameraSession = await startCamera(ui.refs.video);
-    cameraReady = true;
-    ui.setCameraMeta(describeCameraSettings(cameraSession.settings));
-    ui.setCameraStatus('ready', 'Camera live');
-    ui.pushDebugMessage('Webcam connected and ready for live tracking.');
-    ui.syncOverlaySize();
-    console.info('[Mage Hands] Webcam ready.');
+  if (cameraReady) {
     return { ok: true };
-  } catch (error) {
-    cameraReady = false;
-    stopCamera(ui.refs.video);
-    ui.setCameraStatus('error', 'Camera error');
-    ui.setDebugMessage(describeCameraError(error));
-    ui.pushDebugMessage(describeCameraError(error));
-    ui.setStageNotice({
-      title: 'Camera access needed',
-      hint: describeCameraError(error),
-      tone: 'error',
-      hidden: false,
-      showRetry: true,
-    });
-    console.error('[Mage Hands] Failed to access webcam.', error);
-    return { ok: false, error };
   }
+
+  if (cameraInitTask) {
+    return cameraInitTask;
+  }
+
+  cameraInitTask = (async () => {
+    ui.setCameraStatus('loading', 'Requesting camera');
+    setStartupPhase('camera', 'loading', 'Waiting for webcam permission...', { pushLog: true });
+    scheduleStartupNoticeTimers();
+    console.info('[Mage Hands] Requesting webcam access...');
+
+    try {
+      cameraSession = await startCamera(ui.refs.video);
+      cameraReady = true;
+      ui.setCameraMeta(describeCameraSettings(cameraSession.settings));
+      ui.setCameraStatus('ready', 'Camera live');
+      ui.pushDebugMessage('Webcam connected and ready for live tracking.');
+      setStartupPhase('camera', 'ready', 'Webcam connected.');
+      updatePendingStartupNotice();
+      ui.syncOverlaySize();
+      console.info('[Mage Hands] Webcam ready.');
+      return { ok: true };
+    } catch (error) {
+      cameraReady = false;
+      stopCamera(ui.refs.video);
+      ui.setCameraStatus('error', 'Camera error');
+      setStartupPhase('camera', 'error', describeCameraError(error), { pushLog: true });
+      ui.setStageNotice({
+        title: 'Camera access needed',
+        hint: describeCameraError(error),
+        tone: 'error',
+        hidden: false,
+        showRetry: true,
+      });
+      console.error('[Mage Hands] Failed to access webcam.', error);
+      return { ok: false, error };
+    } finally {
+      cameraInitTask = null;
+    }
+  })();
+
+  return cameraInitTask;
 }
 
 function startGameLoop() {
@@ -485,6 +671,7 @@ function startGameLoop() {
     logStartupPhase('game', 'Starting the battle lane loop.');
     game.start();
     ui.pushDebugMessage('Battle lane initialized successfully.');
+    setStartupPhase('game', 'ready', 'Battle lane running.');
   } catch (error) {
     const message = describeGameError(error);
     ui.setDebugMessage(message);
@@ -501,12 +688,19 @@ function startGameLoop() {
 }
 
 async function boot() {
-  logStartupPhase('boot', 'Boot sequence started.');
+  setStartupPhase('boot', 'loading', 'Boot sequence started.', { pushLog: true });
   createSubsystems();
 
   ui.setCameraStatus('loading', 'Starting');
   ui.setModelStatus('loading', 'Loading');
   ui.setHandStatus('idle', 'Stand by');
+  ui.setStageNotice({
+    title: 'Starting spellcasting systems',
+    hint: 'Waiting for webcam permission and loading the hand tracker.',
+    tone: 'neutral',
+    hidden: false,
+    showRetry: false,
+  });
   ui.renderGestureState(gestureController.observeNoHand());
   ui.renderGameState(game.getState());
   startGameLoop();
@@ -516,12 +710,15 @@ async function boot() {
     initializeCamera(),
   ]);
 
+  clearStartupNoticeTimers();
+
   if (modelResult.ok && cameraResult.ok) {
     ui.pushDebugMessage('Startup phase [tracking]: starting the live tracking loop.');
     startTrackingLoop();
   }
 
   summarizeStartup(modelResult, cameraResult);
+  setStartupPhase('boot', 'ready', 'Boot sequence settled.');
 }
 
 async function retrySetup() {
@@ -535,10 +732,11 @@ async function retrySetup() {
   }
 
   stopRenderLoop();
+  clearStartupNoticeTimers();
   lastRawGesture = 'NO_INPUT';
   handPreviouslyVisible = false;
   ui.clearOverlay();
-  ui.setDebugMessage('Retrying startup sequence...');
+  setStartupPhase('boot', 'loading', 'Retrying startup sequence...', { pushLog: true });
   ui.pushDebugMessage('Retry requested by the user.');
   ui.setHandStatus('loading', 'Restarting');
 
@@ -553,10 +751,17 @@ async function retrySetup() {
     ui.renderGestureState(gestureController.observeNoHand());
   }
 
+  if (cameraInitTask || modelInitTask) {
+    ui.pushDebugMessage('Retry joined the current startup attempt.');
+    updatePendingStartupNotice();
+  }
+
   const [modelResult, cameraResult] = await Promise.all([
     modelReady ? Promise.resolve({ ok: true }) : initializeModel(),
     cameraReady ? Promise.resolve({ ok: true }) : initializeCamera(),
   ]);
+
+  clearStartupNoticeTimers();
 
   if (modelResult.ok && cameraResult.ok) {
     startTrackingLoop();
@@ -580,6 +785,12 @@ function restartBattle() {
 }
 
 function bindGlobalListeners() {
+  if (listenersBound || !ui) {
+    return;
+  }
+
+  listenersBound = true;
+
   ui.bindRetry(() => {
     retrySetup().catch((error) => {
       console.error('[Mage Hands] Retry failed.', error);
@@ -600,6 +811,7 @@ function bindGlobalListeners() {
 
   window.addEventListener('beforeunload', () => {
     stopRenderLoop();
+    clearStartupNoticeTimers();
     stopCamera(ui?.refs?.video);
     handTracker?.dispose();
     ui?.dispose?.();
@@ -607,13 +819,7 @@ function bindGlobalListeners() {
   });
 }
 
-boot()
-  .then(() => {
-    if (ui) {
-      bindGlobalListeners();
-    }
-  })
-  .catch((error) => {
+boot().catch((error) => {
     const message =
       error?.name?.startsWith('UI')
         ? describeUiError(error)
