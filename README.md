@@ -65,6 +65,12 @@ npm run build
 - The app expects to be served from `/spell_game/`.
 - Production assets are emitted into `dist/` and are ready for GitHub Pages publishing after `npm run build`.
 
+## Deploy to GitHub Pages
+
+1. Go to `Settings > Pages` in the GitHub repository.
+2. Under `Build and deployment`, choose `GitHub Actions` as the source.
+3. Push to `main` to trigger `.github/workflows/deploy.yml` and publish the site.
+
 ## Libraries used
 
 - `Vite` for local development and production builds
