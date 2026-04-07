@@ -24,25 +24,17 @@
       <div class="relative mx-auto flex min-h-[calc(100vh-2.5rem)] w-full max-w-[96rem] flex-col">
         <header
           data-reveal
-          class="arcane-panel flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between"
+          class="app-header arcane-panel flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between"
         >
-          <div class="space-y-3">
-            <div class="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.32em] text-cyan-100/85">
-              <i data-lucide="sparkles" class="h-4 w-4"></i>
-              Arcane Webcam Battle Demo
-            </div>
+          <div class="app-header__intro space-y-3">
             <div>
-              <p class="font-display text-3xl tracking-[0.2em] text-white sm:text-4xl lg:text-[2.85rem]">
+              <p class="app-header__title font-display text-3xl tracking-[0.2em] text-white sm:text-4xl lg:text-[2.85rem]">
                 Mage Hands
-              </p>
-              <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Match each incoming enemy to its counter-spell, heal when needed, and defend the
-                left side of the lane with one-handed casting.
               </p>
             </div>
           </div>
 
-          <div class="grid gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
+          <div class="header-status-grid grid gap-3 sm:grid-cols-3 lg:min-w-[28rem]">
             <div class="hud-tile">
               <p class="hud-label">Camera</p>
               <div class="mt-2 flex items-center justify-between gap-3">
@@ -88,7 +80,7 @@
                     Spellcasting Lens
                   </p>
                   <p class="mt-1 text-sm text-slate-400">
-                    Compact webcam monitor with the live landmark overlay and spell tracking readout.
+                    Compact webcam monitor with the live landmark overlay and the current spell focus.
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-2 text-[0.64rem] uppercase tracking-[0.22em] text-slate-400">
@@ -111,21 +103,21 @@
                 </div>
               </div>
 
-              <div class="lens-toolbar mt-4 flex flex-wrap gap-2">
-                <div class="glass-pill glass-pill--compact">
-                  <i data-lucide="radar" class="h-3.5 w-3.5 text-cyan-200"></i>
-                  <span>Live inference</span>
-                </div>
-                <div id="stageGestureBadge" class="glass-pill glass-pill--compact">
+                <div class="lens-toolbar mt-4 flex flex-wrap gap-2">
+                  <div class="glass-pill glass-pill--compact">
+                    <i data-lucide="radar" class="h-3.5 w-3.5 text-cyan-200"></i>
+                    <span>Spell lens</span>
+                  </div>
+                  <div id="stageGestureBadge" class="glass-pill glass-pill--compact">
                   <i data-lucide="wand-sparkles" class="h-3.5 w-3.5 text-cyan-200"></i>
                   <span>No spell</span>
                 </div>
               </div>
 
-              <div class="lens-panel__meta mt-4 grid gap-3">
-                <div id="spellReadoutCard" class="spell-readout rounded-[22px] border border-white/10 bg-slate-950/72 px-4 py-4 backdrop-blur-xl">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="min-w-0">
+                <div class="lens-panel__meta mt-4 grid gap-3">
+                  <div id="spellReadoutCard" class="spell-readout rounded-[22px] border border-white/10 bg-slate-950/72 px-4 py-4 backdrop-blur-xl">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="min-w-0">
                       <p class="text-[0.68rem] font-semibold uppercase tracking-[0.28em] text-slate-400">Stable Spell</p>
                       <p id="stageSpellName" class="mt-2 font-display text-xl tracking-[0.14em] text-white sm:text-2xl">No spell</p>
                       <p id="stageSpellDetail" class="mt-2 text-xs leading-5 text-slate-300 sm:text-sm sm:leading-6">
@@ -137,22 +129,18 @@
                       <div class="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/6 sm:h-16 sm:w-16">
                         <i data-lucide="sparkles" class="h-6 w-6 text-[var(--spell-accent)] sm:h-7 sm:w-7"></i>
                       </div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <div class="spell-chip">
-                    <p id="stageRawGestureLabel" class="hud-label">Raw Gesture</p>
-                    <p id="stageRawGesture" class="mt-2 text-base font-semibold text-white sm:text-lg">No hand detected</p>
+                  <div class="grid gap-3">
+                    <div class="spell-chip">
+                      <p class="hud-label">Cooldown</p>
+                      <p id="stageCooldown" class="mt-2 text-base font-semibold text-white sm:text-lg">Ready</p>
+                    </div>
                   </div>
-                  <div class="spell-chip">
-                    <p class="hud-label">Cooldown</p>
-                    <p id="stageCooldown" class="mt-2 text-base font-semibold text-white sm:text-lg">Ready</p>
-                  </div>
-                </div>
 
-                <div id="stageNotice" class="stage-notice stage-notice--neutral rounded-[22px] px-4 py-4 text-left">
+                  <div id="stageNotice" class="stage-notice stage-notice--neutral rounded-[22px] px-4 py-4 text-left">
                   <p id="stageNoticeTitle" class="font-display text-sm tracking-[0.14em] text-white sm:text-base">
                     Initializing arcane sensor
                   </p>
@@ -185,7 +173,7 @@
                   </p>
                 </div>
                 <div class="flex flex-wrap gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
-                  <span id="gameStateBadge" class="status-badge status-badge--ready">Battle Running</span>
+                  <span id="gameStateBadge" class="status-badge status-badge--loading">Wave 1 Soon</span>
                   <span class="rounded-full border border-white/10 bg-white/5 px-3 py-1">One-Hand Control</span>
                 </div>
               </div>
@@ -197,6 +185,188 @@
                 >
                   <canvas id="gameCanvas" class="arena-canvas absolute inset-0 z-0 h-full w-full"></canvas>
 
+                  <div id="mainMenuOverlay" class="main-menu-overlay" aria-hidden="false">
+                    <div class="main-menu-overlay__card">
+                      <p class="main-menu-overlay__eyebrow">Arcane Battle Demo</p>
+                      <h2 id="mainMenuTitle" class="main-menu-overlay__title">Mage Hands</h2>
+                      <p id="mainMenuHint" class="main-menu-overlay__hint">
+                        Step into the lane, read each enemy type, and answer with the matching one-hand spell.
+                      </p>
+                      <button
+                        id="mainMenuPlayButton"
+                        type="button"
+                        class="main-menu-overlay__button"
+                      >
+                        <i data-lucide="sparkles" class="h-4 w-4"></i>
+                        Play
+                      </button>
+                    </div>
+                  </div>
+
+                  <div id="instructionOverlay" class="instruction-overlay is-hidden" aria-hidden="true">
+                    <div class="instruction-overlay__card">
+                      <p class="instruction-overlay__eyebrow">Spellcasting Briefing</p>
+                      <h3 class="instruction-overlay__title">One-Hand Arcane Rules</h3>
+                      <p class="instruction-overlay__hint">
+                        Read the signs, match the aura, and hold the left-side ward against the next wave.
+                      </p>
+
+                      <div class="instruction-overlay__content-grid">
+                        <section class="instruction-section">
+                          <div class="instruction-section__header">
+                            <p class="instruction-section__eyebrow">Gesture Signs</p>
+                            <p class="instruction-section__copy">Hold a one-hand pose steady to lock in the spell.</p>
+                          </div>
+
+                          <div class="instruction-gesture-grid">
+                            <article class="instruction-gesture-card instruction-gesture-card--fireball">
+                              <div class="instruction-gesture-card__glyph" aria-hidden="true">✊</div>
+                              <div class="instruction-gesture-card__meta">
+                                <p class="instruction-rule__label">Fireball</p>
+                                <p class="instruction-rule__value">Closed fist</p>
+                              </div>
+                            </article>
+                            <article class="instruction-gesture-card instruction-gesture-card--lightning">
+                              <div class="instruction-gesture-card__glyph" aria-hidden="true">☝</div>
+                              <div class="instruction-gesture-card__meta">
+                                <p class="instruction-rule__label">Lightning</p>
+                                <p class="instruction-rule__value">Index only</p>
+                              </div>
+                            </article>
+                            <article class="instruction-gesture-card instruction-gesture-card--heal">
+                              <div class="instruction-gesture-card__glyph" aria-hidden="true">✌</div>
+                              <div class="instruction-gesture-card__meta">
+                                <p class="instruction-rule__label">Heal</p>
+                                <p class="instruction-rule__value">Index + middle</p>
+                              </div>
+                            </article>
+                            <article class="instruction-gesture-card instruction-gesture-card--freeze">
+                              <div class="instruction-gesture-card__glyph" aria-hidden="true">👍</div>
+                              <div class="instruction-gesture-card__meta">
+                                <p class="instruction-rule__label">Freeze</p>
+                                <p class="instruction-rule__value">Thumbs up</p>
+                              </div>
+                            </article>
+                          </div>
+                        </section>
+
+                        <section class="instruction-section">
+                          <div class="instruction-section__header">
+                            <p class="instruction-section__eyebrow">Enemy Auras</p>
+                            <p class="instruction-section__copy">The aura color shows which spell breaks the target in one hit.</p>
+                          </div>
+
+                          <div class="instruction-enemy-list">
+                            <article class="instruction-enemy-card">
+                              <div class="instruction-enemy-card__preview">
+                                <svg class="instruction-preview-svg" viewBox="0 0 88 88" aria-hidden="true">
+                                  <defs>
+                                    <radialGradient id="briarPreviewAura" cx="50%" cy="50%" r="50%">
+                                      <stop offset="0%" stop-color="#f87171" stop-opacity="0.32" />
+                                      <stop offset="60%" stop-color="#f87171" stop-opacity="0.14" />
+                                      <stop offset="100%" stop-color="#f87171" stop-opacity="0" />
+                                    </radialGradient>
+                                  </defs>
+                                  <circle cx="44" cy="44" r="30" fill="url(#briarPreviewAura)" />
+                                  <ellipse cx="44" cy="66" rx="18" ry="5" fill="#020617" fill-opacity="0.36" />
+                                  <path d="M44 20 L60 30 L62 49 L51 63 L36 64 L25 50 L28 30 Z" fill="#57412b"/>
+                                  <path d="M35 28 L21 38 L18 52 M53 30 L68 24 L72 42" stroke="#7c5a3b" stroke-width="6" stroke-linecap="round" fill="none"/>
+                                  <path d="M37 63 L32 76 M48 63 L53 77" stroke="#4b2d18" stroke-width="4" stroke-linecap="round"/>
+                                  <ellipse cx="37" cy="31" rx="5" ry="3" transform="rotate(-30 37 31)" fill="#84cc16"/>
+                                  <ellipse cx="52" cy="33" rx="6" ry="3.5" transform="rotate(26 52 33)" fill="#84cc16"/>
+                                  <circle cx="39" cy="42" r="3.2" fill="#fde68a"/>
+                                  <circle cx="50" cy="41" r="3" fill="#fde68a"/>
+                                </svg>
+                              </div>
+                              <div class="instruction-enemy-card__meta">
+                                <p class="instruction-rule__label">Briar Beast</p>
+                                <p class="instruction-rule__value">Red aura → Fireball</p>
+                              </div>
+                            </article>
+
+                            <article class="instruction-enemy-card">
+                              <div class="instruction-enemy-card__preview">
+                                <svg class="instruction-preview-svg" viewBox="0 0 88 88" aria-hidden="true">
+                                  <defs>
+                                    <radialGradient id="constructPreviewAura" cx="50%" cy="50%" r="50%">
+                                      <stop offset="0%" stop-color="#facc15" stop-opacity="0.3" />
+                                      <stop offset="62%" stop-color="#facc15" stop-opacity="0.14" />
+                                      <stop offset="100%" stop-color="#facc15" stop-opacity="0" />
+                                    </radialGradient>
+                                  </defs>
+                                  <circle cx="44" cy="44" r="30" fill="url(#constructPreviewAura)" />
+                                  <ellipse cx="44" cy="66" rx="18" ry="5" fill="#020617" fill-opacity="0.36" />
+                                  <path d="M44 18 L58 28 L63 47 L52 64 L36 64 L25 47 L30 28 Z" fill="#94a3b8"/>
+                                  <path d="M44 23 L55 31 L58 45 L49 58 L39 58 L30 45 L33 31 Z" fill="#4b5563"/>
+                                  <rect x="24" y="34" width="8" height="21" rx="2" fill="#1f2937"/>
+                                  <rect x="56" y="34" width="8" height="21" rx="2" fill="#1f2937"/>
+                                  <path d="M41 31 L47 38 L43 45 L49 54" stroke="#fde047" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                                  <circle cx="39" cy="39" r="3" fill="#fff8c2"/>
+                                  <circle cx="49" cy="39" r="2.8" fill="#fff8c2"/>
+                                </svg>
+                              </div>
+                              <div class="instruction-enemy-card__meta">
+                                <p class="instruction-rule__label">Rune Construct</p>
+                                <p class="instruction-rule__value">Yellow aura → Lightning</p>
+                              </div>
+                            </article>
+
+                            <article class="instruction-enemy-card">
+                              <div class="instruction-enemy-card__preview">
+                                <svg class="instruction-preview-svg" viewBox="0 0 88 88" aria-hidden="true">
+                                  <defs>
+                                    <radialGradient id="wraithPreviewAura" cx="50%" cy="50%" r="52%">
+                                      <stop offset="0%" stop-color="#e0f2fe" stop-opacity="0.34" />
+                                      <stop offset="34%" stop-color="#7dd3fc" stop-opacity="0.24" />
+                                      <stop offset="72%" stop-color="#38bdf8" stop-opacity="0.14" />
+                                      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+                                    </radialGradient>
+                                  </defs>
+                                  <circle cx="44" cy="44" r="31" fill="url(#wraithPreviewAura)" />
+                                  <ellipse cx="44" cy="61" rx="20" ry="8" fill="#e0f2fe" fill-opacity="0.08" />
+                                  <path d="M44 20 C58 29 63 43 58 54 C51 68 52 73 45 63 C39 74 29 68 30 55 C24 43 30 29 44 20 Z" fill="#0f172a"/>
+                                  <path d="M44 24 C54 31 57 42 52 51 C46 61 47 64 43 58 C38 65 31 60 34 51 C30 42 35 31 44 24 Z" fill="#334155" opacity="0.8"/>
+                                  <circle cx="40" cy="33" r="2.7" fill="#e2e8f0"/>
+                                  <circle cx="49" cy="34" r="2.9" fill="#e2e8f0"/>
+                                  <path d="M35 53 C38 66 31 71 28 76 M47 54 C55 64 54 71 58 77" stroke="#94a3b8" stroke-opacity="0.55" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+                                </svg>
+                              </div>
+                              <div class="instruction-enemy-card__meta">
+                                <p class="instruction-rule__label">Shadow Wraith</p>
+                                <p class="instruction-rule__value">Blue-cyan aura → Freeze</p>
+                              </div>
+                            </article>
+                          </div>
+                        </section>
+                      </div>
+
+                      <div class="instruction-overlay__callout">
+                        Heal restores HP once per wave. Save it for pressure spikes between clean spell matches.
+                      </div>
+
+                      <div class="instruction-overlay__footer">
+                        <button
+                          id="instructionBeginButton"
+                          type="button"
+                          class="main-menu-overlay__button"
+                        >
+                          <i data-lucide="wand-sparkles" class="h-4 w-4"></i>
+                          Begin Battle
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="arenaWaveBanner" class="arena-wave-banner" aria-hidden="true">
+                    <div
+                      id="arenaWaveBannerCard"
+                      class="arena-wave-banner__card"
+                    >
+                      <p id="arenaWaveBannerLabel" class="arena-wave-banner__label">Next Wave</p>
+                      <p id="arenaWaveBannerText" class="arena-wave-banner__text">Wave 1</p>
+                    </div>
+                  </div>
+
                   <div class="pointer-events-none absolute inset-x-4 top-4 z-20 grid gap-3 sm:grid-cols-4 xl:max-w-[48rem]">
                     <div class="arena-stat">
                       <p class="arena-stat__label">HP</p>
@@ -207,25 +377,12 @@
                       <p id="arenaScoreValue" class="arena-stat__value">0</p>
                     </div>
                     <div class="arena-stat">
-                      <p class="arena-stat__label">Enemies</p>
+                      <p class="arena-stat__label">Enemies Slain</p>
                       <p id="arenaEnemiesValue" class="arena-stat__value">0</p>
                     </div>
                     <div class="arena-stat">
-                      <p class="arena-stat__label">Freeze</p>
-                      <p id="arenaFreezeValue" class="arena-stat__value">Idle</p>
-                    </div>
-                  </div>
-
-                  <div class="arena-stage-meta pointer-events-none absolute bottom-4 right-4 z-20 flex max-w-[28rem] flex-col items-end gap-3">
-                    <div class="arena-feed">
-                      <p class="hud-label">Battle Feed</p>
-                      <p id="arenaFeedText" class="mt-2 text-sm leading-6 text-slate-200">
-                        Match Fireball to Ember, Lightning to Storm, and Freeze to Frost.
-                      </p>
-                    </div>
-                    <div class="glass-pill">
-                      <i data-lucide="gauge" class="h-4 w-4 text-cyan-200"></i>
-                      <span>Player holds the left lane</span>
+                      <p class="arena-stat__label">Wave</p>
+                      <p id="arenaWaveValue" class="arena-stat__value">Wave 1</p>
                     </div>
                   </div>
 
@@ -248,145 +405,54 @@
                     </div>
                   </div>
                 </div>
-              </div>
-            </section>
-          </section>
 
-          <section class="grid gap-6 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.18fr)_minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-start">
-            <section data-reveal class="arcane-panel px-5 py-5 sm:px-6">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="font-display text-xl tracking-[0.14em] text-white">Status Panel</p>
-                  <p class="mt-1 text-sm text-slate-400">Live readout for the tracker, spell state, and battle lane.</p>
-                </div>
-                <div class="rounded-2xl border border-cyan-300/12 bg-cyan-300/8 p-3 text-cyan-100">
-                  <i data-lucide="scroll-text" class="h-5 w-5"></i>
-                </div>
-              </div>
-
-              <dl class="status-grid mt-5 grid gap-3 md:grid-cols-2">
-                <div class="status-row">
-                  <dt class="status-row__label">Gesture Mode</dt>
-                  <dd id="gestureModeText" class="status-row__value">Legacy one-hand</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Camera Status</dt>
-                  <dd id="cameraStatusText" class="status-row__value">Waiting to start</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Model Status</dt>
-                  <dd id="modelStatusText" class="status-row__value">Loading Hand Landmarker</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Tracking Status</dt>
-                  <dd id="handStatusText" class="status-row__value">No hand detected</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Hand Pose</dt>
-                  <dd id="handPoseText" class="status-row__value">No hand</dd>
-                </div>
-                <div class="status-row">
-                  <dt id="rawGestureLabel" class="status-row__label">Raw Gesture</dt>
-                  <dd id="rawGestureText" class="status-row__value">No hand detected</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Stable Spell</dt>
-                  <dd id="stableSpellText" class="status-row__value spell-value">No spell</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Cooldown</dt>
-                  <dd id="cooldownText" class="status-row__value">Ready</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Player HP</dt>
-                  <dd id="playerHpText" class="status-row__value">100 / 100</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Freeze Echo</dt>
-                  <dd id="freezeStatusText" class="status-row__value">Idle</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Enemies Alive</dt>
-                  <dd id="enemiesText" class="status-row__value">0</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Score</dt>
-                  <dd id="scoreText" class="status-row__value">0</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Defeated</dt>
-                  <dd id="defeatedText" class="status-row__value">0</dd>
-                </div>
-                <div class="status-row">
-                  <dt class="status-row__label">Game State</dt>
-                  <dd id="gameStateText" class="status-row__value">Lane secure</dd>
-                </div>
-                <div class="status-row md:col-span-2">
-                  <dt class="status-row__label">Debug Message</dt>
-                  <dd id="debugMessageText" class="status-row__value">Boot sequence started.</dd>
-                </div>
-              </dl>
-            </section>
-
-            <section data-reveal class="arcane-panel px-5 py-5 sm:px-6">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="font-display text-xl tracking-[0.14em] text-white">Spellbook</p>
-                  <p id="spellbookModeDescription" class="mt-1 text-sm text-slate-400">Single-hand spellcasting is currently active.</p>
-                </div>
-                <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
-                  <i data-lucide="circle-help" class="h-5 w-5"></i>
-                </div>
-              </div>
-
-              <div class="mt-5 grid gap-3 sm:grid-cols-2">
-                <article class="spell-card spell-card--fireball">
-                  <div class="spell-card__icon"><i data-lucide="flame" class="h-5 w-5"></i></div>
-                  <div>
-                    <p id="spellCardFireballTitle" class="spell-card__title">Fireball</p>
-                    <p id="spellCardFireballHint" class="spell-card__hint">Closed fist · Ember</p>
+                <section class="mt-6 border-t border-white/8 pt-5 sm:pt-6">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="font-display text-xl tracking-[0.14em] text-white">Spellbook</p>
+                      <p id="spellbookModeDescription" class="mt-1 text-sm text-slate-400">Single-hand spellcasting is currently active.</p>
+                    </div>
+                    <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
+                      <i data-lucide="circle-help" class="h-5 w-5"></i>
+                    </div>
                   </div>
-                </article>
-                <article class="spell-card spell-card--freeze">
-                  <div class="spell-card__icon"><i data-lucide="snowflake" class="h-5 w-5"></i></div>
-                  <div>
-                    <p id="spellCardFreezeTitle" class="spell-card__title">Freeze</p>
-                    <p id="spellCardFreezeHint" class="spell-card__hint">Thumbs up · Frost</p>
-                  </div>
-                </article>
-                <article class="spell-card spell-card--lightning">
-                  <div class="spell-card__icon"><i data-lucide="zap" class="h-5 w-5"></i></div>
-                  <div>
-                    <p id="spellCardLightningTitle" class="spell-card__title">Lightning</p>
-                    <p id="spellCardLightningHint" class="spell-card__hint">Index finger only · Storm</p>
-                  </div>
-                </article>
-                <article class="spell-card spell-card--heal">
-                  <div class="spell-card__icon"><i data-lucide="heart-pulse" class="h-5 w-5"></i></div>
-                  <div>
-                    <p id="spellCardHealTitle" class="spell-card__title">Heal</p>
-                    <p id="spellCardHealHint" class="spell-card__hint">Index + middle · Restore HP</p>
-                  </div>
-                </article>
-              </div>
 
-              <div id="spellbookBodyText" class="mt-5 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
-                Match Fireball to Ember, Lightning to Storm, and Freeze to Frost. Heal restores HP and keeps the mage alive between threats.
-              </div>
-            </section>
+                  <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                    <article class="spell-card spell-card--fireball">
+                      <div class="spell-card__icon"><i data-lucide="flame" class="h-5 w-5"></i></div>
+                      <div>
+                        <p id="spellCardFireballTitle" class="spell-card__title">Fireball</p>
+                        <p id="spellCardFireballHint" class="spell-card__hint">Closed fist · Red aura</p>
+                      </div>
+                    </article>
+                    <article class="spell-card spell-card--freeze">
+                      <div class="spell-card__icon"><i data-lucide="snowflake" class="h-5 w-5"></i></div>
+                      <div>
+                        <p id="spellCardFreezeTitle" class="spell-card__title">Freeze</p>
+                        <p id="spellCardFreezeHint" class="spell-card__hint">Thumbs up · Blue-cyan aura</p>
+                      </div>
+                    </article>
+                    <article class="spell-card spell-card--lightning">
+                      <div class="spell-card__icon"><i data-lucide="zap" class="h-5 w-5"></i></div>
+                      <div>
+                        <p id="spellCardLightningTitle" class="spell-card__title">Lightning</p>
+                        <p id="spellCardLightningHint" class="spell-card__hint">Index finger only · Yellow aura</p>
+                      </div>
+                    </article>
+                    <article class="spell-card spell-card--heal">
+                      <div class="spell-card__icon"><i data-lucide="heart-pulse" class="h-5 w-5"></i></div>
+                      <div>
+                        <p id="spellCardHealTitle" class="spell-card__title">Heal</p>
+                        <p id="spellCardHealHint" class="spell-card__hint">Index + middle · Restore HP</p>
+                      </div>
+                    </article>
+                  </div>
 
-            <section data-reveal class="arcane-panel px-5 py-5 sm:px-6">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="font-display text-xl tracking-[0.14em] text-white">Arcane Log</p>
-                  <p class="mt-1 text-sm text-slate-400">Recent startup, tracking, and battle events.</p>
-                </div>
-                <div class="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
-                  <i data-lucide="triangle-alert" class="h-5 w-5"></i>
-                </div>
+                  <div id="spellbookBodyText" class="mt-5 rounded-[22px] border border-white/10 bg-white/5 px-4 py-4 text-sm leading-6 text-slate-300">
+                    Read the aura first: red means Fireball, yellow means Lightning, and blue-cyan means Freeze. Heal restores HP once per wave.
+                  </div>
+                </section>
               </div>
-
-              <ul id="debugLog" class="mt-5 space-y-3 text-sm text-slate-300"></ul>
             </section>
           </section>
         </main>

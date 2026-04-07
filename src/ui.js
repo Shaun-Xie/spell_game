@@ -43,11 +43,11 @@ const ACTIVE_PRESENTATION = {
   candidateLabel: 'Raw Gesture',
   spellbookDescription: 'Single-hand spellcasting is currently active.',
   spellbookBody:
-    'Match Fireball to Ember, Lightning to Storm, and Freeze to Frost. Heal restores HP and keeps the mage alive between threats.',
+    'Read the aura first: red means Fireball, yellow means Lightning, and blue-cyan means Freeze. Heal restores HP once per wave.',
   spellbook: {
-    fireball: { title: 'Fireball', hint: 'Closed fist · Ember' },
-    freeze: { title: 'Freeze', hint: 'Thumbs up · Frost' },
-    lightning: { title: 'Lightning', hint: 'Index finger only · Storm' },
+    fireball: { title: 'Fireball', hint: 'Closed fist · Red aura' },
+    freeze: { title: 'Freeze', hint: 'Thumbs up · Blue-cyan aura' },
+    lightning: { title: 'Lightning', hint: 'Index finger only · Yellow aura' },
     heal: { title: 'Heal', hint: 'Index + middle · Restore HP' },
   },
 };
@@ -101,6 +101,12 @@ function formatHealth(playerHp, playerMaxHp) {
   return `${Math.max(0, Math.round(playerHp))} / ${playerMaxHp}`;
 }
 
+function setOptionalText(element, text) {
+  if (element) {
+    element.textContent = text;
+  }
+}
+
 export function createUI() {
   try {
     createIcons({
@@ -133,8 +139,19 @@ export function createUI() {
     arenaHpValue: document.getElementById('arenaHpValue'),
     arenaScoreValue: document.getElementById('arenaScoreValue'),
     arenaEnemiesValue: document.getElementById('arenaEnemiesValue'),
-    arenaFreezeValue: document.getElementById('arenaFreezeValue'),
+    arenaWaveValue: document.getElementById('arenaWaveValue'),
+    arenaPhaseValue: document.getElementById('arenaPhaseValue'),
     arenaFeedText: document.getElementById('arenaFeedText'),
+    mainMenuOverlay: document.getElementById('mainMenuOverlay'),
+    mainMenuTitle: document.getElementById('mainMenuTitle'),
+    mainMenuHint: document.getElementById('mainMenuHint'),
+    mainMenuPlayButton: document.getElementById('mainMenuPlayButton'),
+    instructionOverlay: document.getElementById('instructionOverlay'),
+    instructionBeginButton: document.getElementById('instructionBeginButton'),
+    arenaWaveBanner: document.getElementById('arenaWaveBanner'),
+    arenaWaveBannerCard: document.getElementById('arenaWaveBannerCard'),
+    arenaWaveBannerLabel: document.getElementById('arenaWaveBannerLabel'),
+    arenaWaveBannerText: document.getElementById('arenaWaveBannerText'),
     gameOverOverlay: document.getElementById('gameOverOverlay'),
     gameOverTitle: document.getElementById('gameOverTitle'),
     gameOverText: document.getElementById('gameOverText'),
@@ -161,7 +178,10 @@ export function createUI() {
     stableSpellText: document.getElementById('stableSpellText'),
     cooldownText: document.getElementById('cooldownText'),
     playerHpText: document.getElementById('playerHpText'),
+    waveText: document.getElementById('waveText'),
     freezeStatusText: document.getElementById('freezeStatusText'),
+    healAvailabilityText: document.getElementById('healAvailabilityText'),
+    nextWaveText: document.getElementById('nextWaveText'),
     enemiesText: document.getElementById('enemiesText'),
     scoreText: document.getElementById('scoreText'),
     defeatedText: document.getElementById('defeatedText'),
@@ -187,9 +207,58 @@ export function createUI() {
     debugLog: document.getElementById('debugLog'),
   };
 
-  const missingRefs = Object.entries(refs)
-    .filter(([, value]) => !value)
-    .map(([key]) => key);
+  const requiredRefKeys = [
+    'appShell',
+    'gameCanvas',
+    'gameStateBadge',
+    'arenaHpValue',
+    'arenaScoreValue',
+    'arenaEnemiesValue',
+    'arenaWaveValue',
+    'mainMenuOverlay',
+    'mainMenuTitle',
+    'mainMenuHint',
+    'mainMenuPlayButton',
+    'instructionOverlay',
+    'instructionBeginButton',
+    'arenaWaveBanner',
+    'arenaWaveBannerCard',
+    'arenaWaveBannerLabel',
+    'arenaWaveBannerText',
+    'gameOverOverlay',
+    'gameOverTitle',
+    'gameOverText',
+    'gameRestartButton',
+    'video',
+    'overlay',
+    'stageViewport',
+    'trackingModePill',
+    'cameraRetryButton',
+    'stageNotice',
+    'stageNoticeTitle',
+    'stageNoticeHint',
+    'stageGestureBadge',
+    'cameraStatusBadge',
+    'modelStatusBadge',
+    'handStatusBadge',
+    'stageSpellName',
+    'stageSpellDetail',
+    'stageCooldown',
+    'spellReadoutCard',
+    'cameraResolution',
+    'spellbookModeDescription',
+    'spellbookBodyText',
+    'spellCardFireballTitle',
+    'spellCardFireballHint',
+    'spellCardFreezeTitle',
+    'spellCardFreezeHint',
+    'spellCardLightningTitle',
+    'spellCardLightningHint',
+    'spellCardHealTitle',
+    'spellCardHealHint',
+  ];
+
+  const missingRefs = requiredRefKeys.filter((key) => !refs[key]);
 
   if (missingRefs.length) {
     throw createUiError(
@@ -290,9 +359,9 @@ export function createUI() {
 
   function setGestureMode() {
     refs.trackingModePill.textContent = ACTIVE_PRESENTATION.pill;
-    refs.gestureModeText.textContent = ACTIVE_PRESENTATION.label;
-    refs.rawGestureLabel.textContent = ACTIVE_PRESENTATION.candidateLabel;
-    refs.stageRawGestureLabel.textContent = ACTIVE_PRESENTATION.candidateLabel;
+    setOptionalText(refs.gestureModeText, ACTIVE_PRESENTATION.label);
+    setOptionalText(refs.rawGestureLabel, ACTIVE_PRESENTATION.candidateLabel);
+    setOptionalText(refs.stageRawGestureLabel, ACTIVE_PRESENTATION.candidateLabel);
     refs.spellbookModeDescription.textContent = ACTIVE_PRESENTATION.spellbookDescription;
     refs.spellbookBodyText.textContent = ACTIVE_PRESENTATION.spellbookBody;
     refs.spellCardFireballTitle.textContent = ACTIVE_PRESENTATION.spellbook.fireball.title;
@@ -317,28 +386,38 @@ export function createUI() {
 
   function setCameraStatus(tone, text) {
     setStatusBadge(refs.cameraStatusBadge, text, tone);
-    refs.cameraStatusText.textContent = text;
+    setOptionalText(refs.cameraStatusText, text);
   }
 
   function setModelStatus(tone, text) {
     setStatusBadge(refs.modelStatusBadge, text, tone);
-    refs.modelStatusText.textContent = text;
+    setOptionalText(refs.modelStatusText, text);
   }
 
   function setHandStatus(tone, text) {
     setStatusBadge(refs.handStatusBadge, text, tone);
-    refs.handStatusText.textContent = text;
+    setOptionalText(refs.handStatusText, text);
   }
 
   function setCameraMeta(text) {
-    refs.cameraResolution.textContent = text;
+    if (!refs.cameraResolution) {
+      return;
+    }
+
+    refs.cameraResolution.textContent = text && text !== 'Awaiting video'
+      ? 'Lens calibrated'
+      : text;
   }
 
   function setDebugMessage(message) {
-    refs.debugMessageText.textContent = message;
+    setOptionalText(refs.debugMessageText, message);
   }
 
   function pushDebugMessage(message) {
+    if (!refs.debugLog) {
+      return;
+    }
+
     const entry = document.createElement('li');
     entry.className = 'debug-entry';
     entry.innerHTML = `
@@ -368,6 +447,24 @@ export function createUI() {
 
   function bindGameRestart(handler) {
     refs.gameRestartButton.addEventListener('click', handler);
+  }
+
+  function bindGameStart(handler) {
+    refs.mainMenuPlayButton.addEventListener('click', handler);
+  }
+
+  function bindInstructionStart(handler) {
+    refs.instructionBeginButton.addEventListener('click', handler);
+  }
+
+  function setMainMenuVisible(visible) {
+    refs.mainMenuOverlay.classList.toggle('is-hidden', !visible);
+    refs.mainMenuOverlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  }
+
+  function setInstructionMenuVisible(visible) {
+    refs.instructionOverlay.classList.toggle('is-hidden', !visible);
+    refs.instructionOverlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
   function clearOverlay() {
@@ -448,18 +545,18 @@ export function createUI() {
         ? `${state.cooldown.spell} recharging · ${formatDuration(state.cooldown.remainingMs)}`
         : 'Ready';
 
-    refs.gestureModeText.textContent = state.modeLabel ?? ACTIVE_PRESENTATION.label;
-    refs.handPoseText.textContent = state.handVisible ? state.handStateLabel : 'No hand';
-    refs.rawGestureText.textContent = state.rawGestureLabel;
-    refs.stableSpellText.textContent = stableSpell;
-    refs.cooldownText.textContent = cooldownLabel;
-    refs.stageRawGesture.textContent = state.rawGestureLabel;
+    setOptionalText(refs.gestureModeText, state.modeLabel ?? ACTIVE_PRESENTATION.label);
+    setOptionalText(refs.handPoseText, state.handVisible ? state.handStateLabel : 'No hand');
+    setOptionalText(refs.rawGestureText, state.rawGestureLabel);
+    setOptionalText(refs.stableSpellText, stableSpell);
+    setOptionalText(refs.cooldownText, cooldownLabel);
+    setOptionalText(refs.stageRawGesture, state.rawGestureLabel);
     refs.stageCooldown.textContent = cooldownLabel;
     refs.stageSpellName.textContent = stableSpell;
     refs.stageSpellDetail.textContent = state.stableSpell
-      ? `${state.framesHeld} steady frames locked. Release or switch poses to cast something else.`
+      ? `${stableSpell} is locked in. Release or shift your pose to ready the next cast.`
       : state.handVisible
-        ? 'Hold a mapped one-hand pose steady for a few frames to cast into the battle lane.'
+        ? 'Hold a mapped one-hand pose steady to weave that spell into the lane.'
         : 'Raise one hand inside the webcam frame to begin casting.';
     stageGestureLabel.textContent = stableSpell;
 
@@ -473,25 +570,49 @@ export function createUI() {
   }
 
   function renderGameState(state) {
-    refs.playerHpText.textContent = formatHealth(state.playerHp, state.playerMaxHp);
-    refs.freezeStatusText.textContent = formatFreezeStatus(state.freezeRemainingMs);
-    refs.enemiesText.textContent = `${state.enemiesAlive}`;
-    refs.scoreText.textContent = `${state.score}`;
-    refs.defeatedText.textContent = `${state.defeatedEnemies}`;
-    refs.gameStateText.textContent = state.gameStateLabel;
+    setOptionalText(refs.playerHpText, formatHealth(state.playerHp, state.playerMaxHp));
+    setOptionalText(refs.waveText, `Wave ${state.currentWave}`);
+    setOptionalText(refs.freezeStatusText, formatFreezeStatus(state.freezeRemainingMs));
+    setOptionalText(refs.healAvailabilityText, state.healStatusLabel);
+    setOptionalText(
+      refs.nextWaveText,
+      state.gameOver
+      ? 'Stopped'
+      : state.betweenWaves
+        ? `In ${formatDuration(state.nextWaveCountdownMs)}`
+        : 'Active now',
+    );
+    setOptionalText(refs.enemiesText, `${state.enemiesAlive}`);
+    setOptionalText(refs.scoreText, `${state.score}`);
+    setOptionalText(refs.defeatedText, `${state.defeatedEnemies}`);
+    setOptionalText(refs.gameStateText, state.gameStateLabel);
 
     refs.arenaHpValue.textContent = formatHealth(state.playerHp, state.playerMaxHp);
     refs.arenaScoreValue.textContent = `${state.score}`;
-    refs.arenaEnemiesValue.textContent = `${state.enemiesAlive}`;
-    refs.arenaFreezeValue.textContent = state.freezeActive ? 'Active' : 'Idle';
-    refs.arenaFeedText.textContent = state.feedText;
+    refs.arenaEnemiesValue.textContent = `${state.defeatedEnemies}`;
+    refs.arenaWaveValue.textContent = `Wave ${state.currentWave}`;
+    setOptionalText(
+      refs.arenaPhaseValue,
+      state.gameOver
+        ? 'Game over'
+        : state.betweenWaves
+          ? `Intermission · ${formatDuration(state.nextWaveCountdownMs)}`
+          : `Combat · ${state.threatsRemaining} left`,
+    );
+    setOptionalText(refs.arenaFeedText, state.feedText);
+
+    refs.arenaWaveBanner.classList.toggle('is-hidden', !state.waveBanner?.visible);
+    refs.arenaWaveBannerLabel.textContent = state.waveBanner?.label || 'NEXT WAVE';
+    refs.arenaWaveBannerText.textContent = state.waveBanner?.text || '';
+    refs.arenaWaveBanner.style.opacity = `${state.waveBanner?.opacity ?? 0}`;
+    refs.arenaWaveBannerCard.style.transform = `translateY(${state.waveBanner?.offsetY ?? 12}px) scale(${state.waveBanner?.scale ?? 0.98})`;
 
     if (state.gameOver) {
       setGameStateBadge('Game Over', 'error');
-    } else if (state.freezeActive) {
-      setGameStateBadge('Freeze Cast', 'active');
+    } else if (state.betweenWaves) {
+      setGameStateBadge(`Wave ${state.currentWave} Soon`, 'loading');
     } else {
-      setGameStateBadge('Battle Running', 'ready');
+      setGameStateBadge(`Wave ${state.currentWave}`, 'ready');
     }
 
     refs.gameOverOverlay.classList.toggle('is-hidden', !state.gameOver);
@@ -503,6 +624,8 @@ export function createUI() {
 
   return {
     refs,
+    bindGameStart,
+    bindInstructionStart,
     bindGameRestart,
     bindRetry,
     clearOverlay,
@@ -516,6 +639,8 @@ export function createUI() {
     setDebugMessage,
     setGestureMode,
     setHandStatus,
+    setInstructionMenuVisible,
+    setMainMenuVisible,
     setModelStatus,
     setStageNotice,
     syncOverlaySize,

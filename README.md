@@ -7,6 +7,7 @@ Mage Hands is a browser-based spellcasting battle demo built with Vite, vanilla 
 - Webcam hand tracking runs in the browser with MediaPipe Hand Landmarker.
 - The active control scheme is legacy one-hand casting only.
 - Stable confirmed gestures trigger gameplay spells inside the battle lane.
+- The page opens to a main menu, then a short instruction overlay before combat begins.
 - The game is designed for a quick class/demo presentation: readable, responsive, and visually polished without heavy asset requirements.
 
 ## Current active controls
@@ -21,14 +22,19 @@ If no mapped pose is held steadily enough, the HUD shows `No spell`.
 ## Gameplay
 
 - The player mage is anchored on the left side of the battlefield.
-- Enemies spawn on the right and move left across a horizontal combat lane.
+- Enemies now arrive in distinct waves instead of an endless stream.
+- Each wave spawns on the right and advances left across the combat lane.
 - There are three enemy archetypes:
-  - `Ember` enemies are defeated by `Fireball`
-  - `Storm` enemies are defeated by `Lightning`
-  - `Frost` enemies are defeated by `Freeze`
+  - `Briar Beast` has a red aura and is defeated by `Fireball`
+  - `Rune Construct` has a yellow aura and is defeated by `Lightning`
+  - `Shadow Wraith` has a blue-cyan aura and is defeated by `Freeze`
 - Matching the correct spell defeats that enemy in one hit and awards score.
 - Using the wrong attack spell shows impact feedback, but the enemy survives.
 - `Heal` restores player HP and never damages enemies.
+- `Heal` is limited to one use per wave and refreshes when the next combat wave begins.
+- Click `Play`, read the short instruction panel, then press `X` or the begin button to start combat.
+- When a wave is cleared, the game enters a short intermission before the next wave begins.
+- Later waves now scale up faster through larger enemy counts, faster movement, tighter spawn pacing, and denser concurrent pressure.
 - The battle ends when player HP reaches `0`.
 - Use the on-screen restart button or press `R` / `Enter` after game over to reset the fight.
 
@@ -93,7 +99,9 @@ Main gameplay tuning points:
 
 - Enemy speed: `src/game.js` inside `GAME_SETTINGS.enemySpeedMin` and `GAME_SETTINGS.enemySpeedMax`
 - Player HP: `src/game.js` inside `GAME_SETTINGS.playerMaxHp`
-- Spawn behavior: `src/game.js` inside `GAME_SETTINGS.maxActiveEnemies`, `spawnIntervalMinMs`, and `spawnIntervalMaxMs`
+- Wave size, intermission timing, spawn pacing, and concurrent-enemy caps: `src/game.js` inside `WAVE_SETTINGS`
+- Base spawn timing: `src/game.js` inside `GAME_SETTINGS.spawnIntervalMinMs` and `GAME_SETTINGS.spawnIntervalMaxMs`
+- Heal availability per wave: `src/game.js` inside the wave state and `castSpell(...)`
 - Contact damage: `src/game.js` inside `GAME_SETTINGS.enemyContactDamage`
 - Wrong-spell feedback and pushback: `src/game.js` inside `MATCH_SETTINGS`
 - Fireball / lightning / heal / freeze numbers: `src/spells.js` inside `SPELL_CONFIG`

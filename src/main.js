@@ -21,6 +21,8 @@ let cameraInitTask = null;
 let listenersBound = false;
 let startupNoticeDelayId = null;
 let startupNoticeEscalationId = null;
+let gameStarted = false;
+let instructionMenuVisible = false;
 
 const startupPhases = {
   boot: { status: 'idle', detail: '' },
@@ -333,8 +335,8 @@ function stopRenderLoop() {
 
 function getTrackingIdleCopy() {
   return {
-    title: 'Raise one hand into view',
-    hint: 'Hold a mapped one-hand pose steady for a few frames to cast into the battle lane.',
+    title: 'Spell lens ready',
+    hint: 'Raise one hand into the lens whenever you are ready to cast.',
   };
 }
 
@@ -357,10 +359,10 @@ function updateStageNoticeForState(state) {
 
   if (!state.handVisible) {
     ui.setStageNotice({
-      title: 'No hand detected',
-      hint: 'Raise one hand inside the webcam frame to begin casting.',
+      title: 'Spell lens ready',
+      hint: 'Raise one hand inside the webcam frame whenever you are ready to cast.',
       tone: 'neutral',
-      hidden: false,
+      hidden: true,
       showRetry: false,
     });
     return;
@@ -458,7 +460,7 @@ function startTrackingLoop() {
     title: idleCopy.title,
     hint: idleCopy.hint,
     tone: 'neutral',
-    hidden: false,
+    hidden: true,
     showRetry: false,
   });
   ui.setHandStatus('ready', 'Tracking online');
@@ -480,7 +482,7 @@ function startTrackingLoop() {
       if (!detection) {
         const noHandState = gestureController.observeNoHand(timestamp);
         ui.clearOverlay();
-        ui.setHandStatus('idle', 'No hand detected');
+        ui.setHandStatus('idle', 'Stand By');
         ui.renderGestureState(noHandState);
         ui.setDebugMessage(getTrackingMessage(noHandState));
         updateStageNoticeForState(noHandState);
@@ -507,6 +509,15 @@ function startTrackingLoop() {
       }
 
       if (gestureState.confirmedSpell) {
+        if (!gameStarted) {
+          ui.setDebugMessage(
+            instructionMenuVisible
+              ? 'Tracking is ready. Press X or Begin Battle to start the fight.'
+              : 'Tracking is ready. Press Play to continue.',
+          );
+          return;
+        }
+
         ui.playSpellConfirm(gestureState.confirmedSpell);
         const castResult = game.castSpell(gestureState.confirmedSpell, timestamp);
 
@@ -687,6 +698,51 @@ function startGameLoop() {
   }
 }
 
+function startBattleFromMenu() {
+  if (!game || !gameReady || !ui) {
+    showEmergencyStartupError(
+      'Battle lane unavailable',
+      'The battle lane is not ready yet. Refresh the page and try again.',
+      { showRetry: false },
+    );
+    return;
+  }
+
+  if (gameStarted) {
+    ui.setMainMenuVisible(false);
+    return;
+  }
+
+  ui.setMainMenuVisible(false);
+  ui.setInstructionMenuVisible(true);
+  instructionMenuVisible = true;
+  ui.setDebugMessage('Spell briefing opened. Press X when you are ready to begin.');
+  ui.pushDebugMessage('Main menu dismissed. Spell briefing opened.');
+}
+
+function beginBattleFromInstructions() {
+  if (!game || !gameReady || !ui) {
+    showEmergencyStartupError(
+      'Battle lane unavailable',
+      'The battle lane is not ready yet. Refresh the page and try again.',
+      { showRetry: false },
+    );
+    return;
+  }
+
+  instructionMenuVisible = false;
+  ui.setInstructionMenuVisible(false);
+  ui.setMainMenuVisible(false);
+
+  if (!gameStarted) {
+    game.restart();
+    startGameLoop();
+    gameStarted = true;
+    ui.setDebugMessage('Battle started. Wave 1 is gathering behind the ward.');
+    ui.pushDebugMessage('Spell briefing dismissed. Battle lane is now live.');
+  }
+}
+
 async function boot() {
   setStartupPhase('boot', 'loading', 'Boot sequence started.', { pushLog: true });
   createSubsystems();
@@ -703,7 +759,8 @@ async function boot() {
   });
   ui.renderGestureState(gestureController.observeNoHand());
   ui.renderGameState(game.getState());
-  startGameLoop();
+  ui.setMainMenuVisible(true);
+  ui.setInstructionMenuVisible(false);
 
   const [modelResult, cameraResult] = await Promise.all([
     initializeModel(),
@@ -781,7 +838,11 @@ function restartBattle() {
   }
 
   game.restart();
-  ui.setDebugMessage('Battle reset. Match each enemy to the correct spell and defend the lane.');
+  gameStarted = true;
+  instructionMenuVisible = false;
+  ui?.setMainMenuVisible(false);
+  ui?.setInstructionMenuVisible(false);
+  ui.setDebugMessage('Battle reset. Wave 1 is regrouping and the lane will reopen after a short pause.');
 }
 
 function bindGlobalListeners() {
@@ -799,11 +860,25 @@ function bindGlobalListeners() {
     });
   });
 
+  ui.bindGameStart(() => {
+    startBattleFromMenu();
+  });
+
+  ui.bindInstructionStart(() => {
+    beginBattleFromInstructions();
+  });
+
   ui.bindGameRestart(() => {
     restartBattle();
   });
 
   window.addEventListener('keydown', (event) => {
+    if (instructionMenuVisible && (event.key === 'x' || event.key === 'X')) {
+      event.preventDefault();
+      beginBattleFromInstructions();
+      return;
+    }
+
     if ((event.key === 'r' || event.key === 'R' || event.key === 'Enter') && game?.getState().gameOver) {
       restartBattle();
     }
