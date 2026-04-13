@@ -7,7 +7,7 @@ Mage Hands is a browser-based spellcasting battle demo built with Vite, vanilla 
 - Webcam hand tracking runs in the browser with MediaPipe Hand Landmarker.
 - The active control scheme is legacy one-hand casting only.
 - Stable confirmed gestures trigger gameplay spells inside the battle lane.
-- The page opens to a main menu, then a short instruction overlay before combat begins.
+- The page opens to a main menu, then a short instruction overlay, then a guided in-game tutorial before the real wave battle begins.
 - The game is designed for a quick class/demo presentation: readable, responsive, and visually polished without heavy asset requirements.
 
 ## Current active controls
@@ -32,7 +32,10 @@ If no mapped pose is held steadily enough, the HUD shows `No spell`.
 - Using the wrong attack spell shows impact feedback, but the enemy survives.
 - `Heal` restores player HP and never damages enemies.
 - `Heal` is limited to one use per wave and refreshes when the next combat wave begins.
-- Click `Play`, read the short instruction panel, then press `X` or the begin button to start combat.
+- Click `Play`, read the short instruction panel, then begin the guided tutorial.
+- The tutorial teaches gesture casting, aura matching, the three enemy weaknesses, heal timing, and the overall lane flow.
+- Each enemy lesson requires the correct spell before the tutorial advances.
+- The tutorial can be skipped from the in-game tutorial panel if you want to jump straight to Wave 1.
 - When a wave is cleared, the game enters a short intermission before the next wave begins.
 - Later waves now scale up faster through larger enemy counts, faster movement, tighter spawn pacing, and denser concurrent pressure.
 - The battle ends when player HP reaches `0`.
@@ -46,6 +49,8 @@ npm run dev
 ```
 
 Open the Vite URL shown in the terminal, allow webcam access, and keep one hand inside the tracking panel.
+
+Vite `8.0.5` in this project requires Node `20.19+` or `22.12+`.
 
 To test the built app locally, serve it instead of opening `dist/index.html` directly:
 

@@ -152,6 +152,15 @@ export function createUI() {
     arenaWaveBannerCard: document.getElementById('arenaWaveBannerCard'),
     arenaWaveBannerLabel: document.getElementById('arenaWaveBannerLabel'),
     arenaWaveBannerText: document.getElementById('arenaWaveBannerText'),
+    tutorialPanel: document.getElementById('tutorialPanel'),
+    tutorialTitle: document.getElementById('tutorialTitle'),
+    tutorialProgress: document.getElementById('tutorialProgress'),
+    tutorialDescription: document.getElementById('tutorialDescription'),
+    tutorialObjective: document.getElementById('tutorialObjective'),
+    tutorialHighlights: document.getElementById('tutorialHighlights'),
+    tutorialContinueButton: document.getElementById('tutorialContinueButton'),
+    tutorialContinueLabel: document.getElementById('tutorialContinueLabel'),
+    tutorialSkipButton: document.getElementById('tutorialSkipButton'),
     gameOverOverlay: document.getElementById('gameOverOverlay'),
     gameOverTitle: document.getElementById('gameOverTitle'),
     gameOverText: document.getElementById('gameOverText'),
@@ -225,6 +234,15 @@ export function createUI() {
     'arenaWaveBannerCard',
     'arenaWaveBannerLabel',
     'arenaWaveBannerText',
+    'tutorialPanel',
+    'tutorialTitle',
+    'tutorialProgress',
+    'tutorialDescription',
+    'tutorialObjective',
+    'tutorialHighlights',
+    'tutorialContinueButton',
+    'tutorialContinueLabel',
+    'tutorialSkipButton',
     'gameOverOverlay',
     'gameOverTitle',
     'gameOverText',
@@ -278,6 +296,7 @@ export function createUI() {
 
   const stageGestureLabel =
     refs.stageGestureBadge.querySelector('span') ?? refs.stageGestureBadge;
+  let lastTutorialSignature = 'inactive';
   const confirmSound = (() => {
     try {
       return new Howl({
@@ -449,6 +468,14 @@ export function createUI() {
     refs.gameRestartButton.addEventListener('click', handler);
   }
 
+  function bindTutorialContinue(handler) {
+    refs.tutorialContinueButton.addEventListener('click', handler);
+  }
+
+  function bindTutorialSkip(handler) {
+    refs.tutorialSkipButton.addEventListener('click', handler);
+  }
+
   function bindGameStart(handler) {
     refs.mainMenuPlayButton.addEventListener('click', handler);
   }
@@ -570,17 +597,20 @@ export function createUI() {
   }
 
   function renderGameState(state) {
+    renderTutorialState(state.tutorial);
     setOptionalText(refs.playerHpText, formatHealth(state.playerHp, state.playerMaxHp));
-    setOptionalText(refs.waveText, `Wave ${state.currentWave}`);
+    setOptionalText(refs.waveText, state.waveDisplayLabel ?? `Wave ${state.currentWave}`);
     setOptionalText(refs.freezeStatusText, formatFreezeStatus(state.freezeRemainingMs));
     setOptionalText(refs.healAvailabilityText, state.healStatusLabel);
     setOptionalText(
       refs.nextWaveText,
-      state.gameOver
-      ? 'Stopped'
-      : state.betweenWaves
-        ? `In ${formatDuration(state.nextWaveCountdownMs)}`
-        : 'Active now',
+      state.tutorial?.active
+        ? 'After tutorial'
+        : state.gameOver
+          ? 'Stopped'
+          : state.betweenWaves
+            ? `In ${formatDuration(state.nextWaveCountdownMs)}`
+            : 'Active now',
     );
     setOptionalText(refs.enemiesText, `${state.enemiesAlive}`);
     setOptionalText(refs.scoreText, `${state.score}`);
@@ -590,15 +620,8 @@ export function createUI() {
     refs.arenaHpValue.textContent = formatHealth(state.playerHp, state.playerMaxHp);
     refs.arenaScoreValue.textContent = `${state.score}`;
     refs.arenaEnemiesValue.textContent = `${state.defeatedEnemies}`;
-    refs.arenaWaveValue.textContent = `Wave ${state.currentWave}`;
-    setOptionalText(
-      refs.arenaPhaseValue,
-      state.gameOver
-        ? 'Game over'
-        : state.betweenWaves
-          ? `Intermission · ${formatDuration(state.nextWaveCountdownMs)}`
-          : `Combat · ${state.threatsRemaining} left`,
-    );
+    refs.arenaWaveValue.textContent = state.waveDisplayLabel ?? `Wave ${state.currentWave}`;
+    setOptionalText(refs.arenaPhaseValue, state.phaseDisplayLabel);
     setOptionalText(refs.arenaFeedText, state.feedText);
 
     refs.arenaWaveBanner.classList.toggle('is-hidden', !state.waveBanner?.visible);
@@ -609,6 +632,8 @@ export function createUI() {
 
     if (state.gameOver) {
       setGameStateBadge('Game Over', 'error');
+    } else if (state.tutorial?.active) {
+      setGameStateBadge('Tutorial', 'active');
     } else if (state.betweenWaves) {
       setGameStateBadge(`Wave ${state.currentWave} Soon`, 'loading');
     } else {
@@ -622,11 +647,67 @@ export function createUI() {
       : '';
   }
 
+  function renderTutorialState(tutorial) {
+    const isActive = Boolean(tutorial?.active);
+    const tutorialSignature = isActive
+      ? [
+        tutorial.key,
+        tutorial.title,
+        tutorial.description,
+        tutorial.accentSpell,
+        tutorial.progressLabel,
+        tutorial.objective,
+        tutorial.continueLabel,
+        tutorial.canContinue,
+        tutorial.showSkip,
+        ...(tutorial.highlights ?? []),
+      ].join('|')
+      : 'inactive';
+
+    refs.tutorialPanel.classList.toggle('is-hidden', !isActive);
+    refs.tutorialPanel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+
+    if (!isActive) {
+      if (lastTutorialSignature !== 'inactive') {
+        refs.tutorialHighlights.replaceChildren();
+      }
+      lastTutorialSignature = 'inactive';
+      refs.tutorialPanel.dataset.spellTheme = 'Neutral';
+      refs.tutorialContinueButton.classList.add('hidden');
+      refs.tutorialSkipButton.classList.remove('hidden');
+      return;
+    }
+
+    if (tutorialSignature === lastTutorialSignature) {
+      return;
+    }
+
+    lastTutorialSignature = tutorialSignature;
+    refs.tutorialPanel.dataset.spellTheme = tutorial.accentSpell ?? 'Neutral';
+    refs.tutorialTitle.textContent = tutorial.title;
+    refs.tutorialProgress.textContent = tutorial.progressLabel;
+    refs.tutorialDescription.textContent = tutorial.description;
+    refs.tutorialObjective.textContent = tutorial.objective;
+    refs.tutorialContinueLabel.textContent = tutorial.continueLabel ?? 'Continue';
+    refs.tutorialContinueButton.classList.toggle('hidden', !tutorial.canContinue);
+    refs.tutorialSkipButton.classList.toggle('hidden', !tutorial.showSkip);
+
+    refs.tutorialHighlights.replaceChildren();
+    (tutorial.highlights ?? []).forEach((highlight) => {
+      const chip = document.createElement('li');
+      chip.className = 'tutorial-panel__chip';
+      chip.textContent = highlight;
+      refs.tutorialHighlights.append(chip);
+    });
+  }
+
   return {
     refs,
     bindGameStart,
     bindInstructionStart,
     bindGameRestart,
+    bindTutorialContinue,
+    bindTutorialSkip,
     bindRetry,
     clearOverlay,
     drawHandOverlay,

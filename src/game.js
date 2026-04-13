@@ -1,6 +1,7 @@
 import {
   ENEMY_ARCHETYPE_KEYS,
   clamp,
+  formatDuration,
   getEnemyArchetype,
   randomRange,
   rgbaFromRgbString,
@@ -46,6 +47,103 @@ export const WAVE_SETTINGS = {
   spawnBackpressureMs: 180,
   waveBannerDurationMs: 1550,
 };
+
+const TUTORIAL_SETTINGS = {
+  enemySpeed: 72,
+  enemySpawnInsetFactor: 0.04,
+  enemyHoldOffsetPx: 72,
+  healLessonDamage: 30,
+  stepAdvanceDelayMs: 520,
+};
+
+const TUTORIAL_STEPS = [
+  {
+    key: 'spell-signs',
+    title: 'Step 1 · Spell Signs',
+    description: 'Each one-hand sign casts a spell into the lane once the pose locks in.',
+    objective: 'Cast any mapped spell to continue.',
+    action: 'cast_any',
+    accentSpell: 'Neutral',
+    highlights: [
+      'Closed fist -> Fireball',
+      'Index only -> Lightning',
+      'Index + middle -> Heal',
+      'Thumbs up -> Freeze',
+    ],
+  },
+  {
+    key: 'aura-matching',
+    title: 'Step 2 · Read The Aura',
+    description: 'Aura color reveals the enemy weakness before you cast.',
+    objective: 'Red means Fireball. Yellow means Lightning. Blue-cyan means Freeze.',
+    action: 'continue',
+    continueLabel: 'Continue',
+    accentSpell: 'Neutral',
+    highlights: [
+      'Red aura -> Fireball',
+      'Yellow aura -> Lightning',
+      'Blue-cyan aura -> Freeze',
+    ],
+  },
+  {
+    key: 'briar-beast',
+    title: 'Step 3 · Briar Beast',
+    description: 'The Briar Beast glows red, so it falls to Fireball.',
+    objective: 'Cast Fireball to defeat the Briar Beast.',
+    action: 'enemy',
+    enemyType: 'EMBER',
+    expectedSpell: 'Fireball',
+    accentSpell: 'Fireball',
+    highlights: [
+      'Enemy: Briar Beast',
+      'Aura: Red',
+      'Weakness: Fireball',
+    ],
+  },
+  {
+    key: 'rune-construct',
+    title: 'Step 4 · Rune Construct',
+    description: 'The Rune Construct crackles with yellow energy, so answer with Lightning.',
+    objective: 'Cast Lightning to defeat the Rune Construct.',
+    action: 'enemy',
+    enemyType: 'STORM',
+    expectedSpell: 'Lightning',
+    accentSpell: 'Lightning',
+    highlights: [
+      'Enemy: Rune Construct',
+      'Aura: Yellow',
+      'Weakness: Lightning',
+    ],
+  },
+  {
+    key: 'shadow-wraith',
+    title: 'Step 5 · Shadow Wraith',
+    description: 'The Shadow Wraith carries a blue-cyan aura and must be frozen.',
+    objective: 'Cast Freeze to defeat the Shadow Wraith.',
+    action: 'enemy',
+    enemyType: 'FROST',
+    expectedSpell: 'Freeze',
+    accentSpell: 'Freeze',
+    highlights: [
+      'Enemy: Shadow Wraith',
+      'Aura: Blue-cyan',
+      'Weakness: Freeze',
+    ],
+  },
+  {
+    key: 'heal-lesson',
+    title: 'Step 6 · Heal',
+    description: 'Heal restores HP and refreshes once each real combat wave.',
+    objective: 'Cast Heal now to restore the mage.',
+    action: 'heal',
+    accentSpell: 'Heal',
+    highlights: [
+      'Gesture: Index + middle',
+      'Effect: Restores HP',
+      'Limit: Once per wave',
+    ],
+  },
+];
 
 function createGameError(name, message) {
   const error = new Error(message);
@@ -109,6 +207,14 @@ function createInitialState() {
     waveBannerMs: WAVE_SETTINGS.waveBannerDurationMs,
     waveBannerMaxMs: WAVE_SETTINGS.waveBannerDurationMs,
     feedText: 'Wave 1 is gathering. Read the aura: red for Fireball, yellow for Lightning, blue-cyan for Freeze.',
+    tutorial: {
+      active: false,
+      completed: false,
+      stepIndex: -1,
+      pendingStepIndex: null,
+      pendingAdvanceAt: 0,
+      targetEnemyId: null,
+    },
     nextEnemyId: 1,
     nextProjectileId: 1,
   };
@@ -252,6 +358,183 @@ export function createGame({
   const resizeBinding = createResizeBinding(canvas, syncLayout);
   syncLayout();
 
+  function getTutorialStep(stepIndex = state.tutorial.stepIndex) {
+    return TUTORIAL_STEPS[stepIndex] ?? null;
+  }
+
+  function clearCombatActors({ keepEffects = false } = {}) {
+    state.enemies = [];
+    state.projectiles = [];
+    state.beams = [];
+
+    if (!keepEffects) {
+      state.particles = [];
+      state.rings = [];
+    }
+  }
+
+  function queueTutorialAdvance(nextStepIndex, now, delayMs = TUTORIAL_SETTINGS.stepAdvanceDelayMs) {
+    if (!state.tutorial.active) {
+      return;
+    }
+
+    state.tutorial.pendingStepIndex = nextStepIndex;
+    state.tutorial.pendingAdvanceAt = now + delayMs;
+  }
+
+  function spawnTutorialEnemy(typeKey, now) {
+    const archetype = getEnemyArchetype(typeKey);
+    const tutorialHoldX = Math.max(
+      layout.contactX + GAME_SETTINGS.enemyRadius + TUTORIAL_SETTINGS.enemyHoldOffsetPx,
+      viewportWidth * 0.52,
+    );
+    const enemy = createEnemy(now, getWaveProfile(1), {
+      typeKey,
+      laneIndex: 1,
+      speed: TUTORIAL_SETTINGS.enemySpeed,
+      spawnX: layout.spawnX - viewportWidth * TUTORIAL_SETTINGS.enemySpawnInsetFactor,
+      tutorialStopX: tutorialHoldX,
+      preventContactDamage: true,
+    });
+
+    state.enemies.push(enemy);
+    state.tutorial.targetEnemyId = enemy.id;
+    state.particles.push(
+      ...createBurstParticles({
+        x: enemy.x,
+        y: getEnemyY(enemy, now),
+        color: archetype.rgb,
+        count: 12,
+        minSpeed: 30,
+        maxSpeed: 140,
+        lifeMs: 460,
+      }),
+    );
+    state.rings.push(
+      createRingEffect({
+        x: enemy.x,
+        y: getEnemyY(enemy, now),
+        color: archetype.rgb,
+        maxRadius: enemy.radius * 1.8,
+        lifeMs: 420,
+        lineWidth: 2,
+      }),
+    );
+  }
+
+  function enterTutorialStep(stepIndex, now = performance.now()) {
+    const step = getTutorialStep(stepIndex);
+
+    if (!step) {
+      return;
+    }
+
+    state.tutorial.stepIndex = stepIndex;
+    state.tutorial.pendingStepIndex = null;
+    state.tutorial.pendingAdvanceAt = 0;
+    state.tutorial.targetEnemyId = null;
+    state.waveState = 'tutorial';
+    state.spawnCooldownMs = 0;
+    state.nextWaveCountdownMs = 0;
+    state.waveBannerMs = 0;
+    state.waveBannerMaxMs = 0;
+    state.waveBannerLabel = '';
+    state.waveBannerText = '';
+    clearCombatActors();
+
+    if (step.action === 'heal') {
+      state.player.hp = Math.max(
+        Math.round(state.player.maxHp * 0.65),
+        state.player.maxHp - TUTORIAL_SETTINGS.healLessonDamage,
+      );
+      state.player.damageFlashMs = 180;
+    } else {
+      state.player.hp = state.player.maxHp;
+      state.player.damageFlashMs = 0;
+    }
+
+    if (step.action === 'enemy') {
+      spawnTutorialEnemy(step.enemyType, now);
+    }
+
+    pushBattleEvent(step.title, step.objective);
+  }
+
+  function startTutorial(now = performance.now()) {
+    state.tutorial.active = true;
+    state.tutorial.completed = false;
+    state.tutorial.stepIndex = -1;
+    state.tutorial.pendingStepIndex = null;
+    state.tutorial.pendingAdvanceAt = 0;
+    state.tutorial.targetEnemyId = null;
+    enterTutorialStep(0, now);
+  }
+
+  function beginMainGame(now = performance.now(), { skipped = false } = {}) {
+    const freshState = createInitialState();
+    Object.assign(state, freshState);
+    syncLayout();
+    state.feedText = skipped
+      ? 'Tutorial skipped. Wave 1 is gathering. Read the aura before you cast.'
+      : 'Tutorial complete. Wave 1 is gathering beyond the gate.';
+    state.waveBannerLabel = skipped ? 'WAVE 1' : 'TUTORIAL COMPLETE';
+    state.waveBannerText = 'Wave 1';
+    state.waveBannerMs = WAVE_SETTINGS.waveBannerDurationMs;
+    state.waveBannerMaxMs = WAVE_SETTINGS.waveBannerDurationMs;
+    onBattleEvent(
+      skipped
+        ? 'Tutorial skipped. Wave 1 begins after a short pause.'
+        : 'Tutorial complete. Wave 1 begins after a short pause.',
+    );
+  }
+
+  function updateTutorialProgress(now) {
+    if (!state.tutorial.active || state.tutorial.pendingStepIndex == null) {
+      return;
+    }
+
+    if (now < state.tutorial.pendingAdvanceAt) {
+      return;
+    }
+
+    const nextStepIndex = state.tutorial.pendingStepIndex;
+    state.tutorial.pendingStepIndex = null;
+    state.tutorial.pendingAdvanceAt = 0;
+
+    if (nextStepIndex >= TUTORIAL_STEPS.length) {
+      beginMainGame(now);
+      return;
+    }
+
+    enterTutorialStep(nextStepIndex, now);
+  }
+
+  function getTutorialSnapshot() {
+    if (!state.tutorial.active) {
+      return { active: false };
+    }
+
+    const step = getTutorialStep();
+
+    if (!step) {
+      return { active: false };
+    }
+
+    return {
+      active: true,
+      key: step.key,
+      title: step.title,
+      description: step.description,
+      objective: step.objective,
+      accentSpell: step.accentSpell ?? 'Neutral',
+      highlights: step.highlights ?? [],
+      canContinue: step.action === 'continue',
+      continueLabel: step.continueLabel ?? 'Continue',
+      showSkip: true,
+      progressLabel: `Lesson ${state.tutorial.stepIndex + 1} / ${TUTORIAL_STEPS.length}`,
+    };
+  }
+
   function scheduleNextSpawn() {
     const waveProfile = getWaveProfile(state.currentWave);
     state.spawnCooldownMs = randomRange(
@@ -276,20 +559,23 @@ export function createGame({
       + Math.sin(now / 610 + enemy.bobOffset * 1.2) * 2;
   }
 
-  function createEnemy(now, waveProfile) {
-    const laneIndex = Math.floor(randomRange(0, layout.laneYs.length));
-    const typeKey = ENEMY_ARCHETYPE_KEYS[Math.floor(randomRange(0, ENEMY_ARCHETYPE_KEYS.length))];
+  function createEnemy(now, waveProfile, options = {}) {
+    const laneIndex = Number.isInteger(options.laneIndex)
+      ? clamp(options.laneIndex, 0, layout.laneYs.length - 1)
+      : Math.floor(randomRange(0, layout.laneYs.length));
+    const typeKey = options.typeKey
+      ?? ENEMY_ARCHETYPE_KEYS[Math.floor(randomRange(0, ENEMY_ARCHETYPE_KEYS.length))];
     const archetype = getEnemyArchetype(typeKey);
 
     return {
       id: state.nextEnemyId++,
       type: archetype.key,
       weaknessSpell: archetype.spell,
-      x: layout.spawnX + randomRange(0, viewportWidth * 0.08),
+      x: options.spawnX ?? (layout.spawnX + randomRange(0, viewportWidth * 0.08)),
       y: layout.laneYs[laneIndex],
       laneIndex,
       radius: GAME_SETTINGS.enemyRadius,
-      speed: randomRange(waveProfile.enemySpeedMin, waveProfile.enemySpeedMax),
+      speed: options.speed ?? randomRange(waveProfile.enemySpeedMin, waveProfile.enemySpeedMax),
       hp: 1,
       maxHp: 1,
       bobOffset: randomRange(0, Math.PI * 2),
@@ -297,6 +583,8 @@ export function createGame({
       hitFlashMs: 0,
       hitFlashColor: archetype.rgb,
       spawnFlashMs: 260,
+      tutorialStopX: options.tutorialStopX ?? null,
+      preventContactDamage: Boolean(options.preventContactDamage),
     };
   }
 
@@ -366,10 +654,13 @@ export function createGame({
     const archetype = getEnemyArchetype(enemy.type);
     const scoreValue = SPELL_CONFIG[spellName]?.scoreValue ?? 10;
     const burstColor = getSpellImpactColor(spellName);
+    const isTutorialEnemy = state.tutorial.active;
 
-    state.score += scoreValue;
-    state.defeatedEnemies += 1;
-    state.waveResolved += 1;
+    if (!isTutorialEnemy) {
+      state.score += scoreValue;
+      state.defeatedEnemies += 1;
+      state.waveResolved += 1;
+    }
     state.rings.push(
       createRingEffect({
         x: enemy.x,
@@ -391,7 +682,25 @@ export function createGame({
         lifeMs: 520,
       }),
     );
-    pushBattleEvent('Correct spell', `${spellName} shattered the ${archetype.label} enemy. Score +${scoreValue}.`);
+    pushBattleEvent(
+      'Correct spell',
+      isTutorialEnemy
+        ? `${spellName} shattered the ${archetype.label}.`
+        : `${spellName} shattered the ${archetype.label} enemy. Score +${scoreValue}.`,
+    );
+
+    if (isTutorialEnemy) {
+      const tutorialStep = getTutorialStep();
+
+      if (
+        tutorialStep?.action === 'enemy'
+        && tutorialStep.expectedSpell === spellName
+        && enemy.id === state.tutorial.targetEnemyId
+      ) {
+        state.tutorial.targetEnemyId = null;
+        queueTutorialAdvance(state.tutorial.stepIndex + 1, now);
+      }
+    }
   }
 
   function startWave(now) {
@@ -529,12 +838,19 @@ export function createGame({
 
       enemy.y = getEnemyY(enemy, now);
       enemy.x -= enemy.speed * deltaSeconds;
+      if (enemy.preventContactDamage && enemy.tutorialStopX != null && enemy.x <= enemy.tutorialStopX) {
+        enemy.x = enemy.tutorialStopX;
+      }
       enemy.hitFlashMs = Math.max(0, enemy.hitFlashMs - deltaSeconds * 1000);
       enemy.hitFlash = enemy.hitFlashMs > 0 ? enemy.hitFlashMs / 180 : 0;
       enemy.spawnFlashMs = Math.max(0, enemy.spawnFlashMs - deltaSeconds * 1000);
 
       if (enemy.hp <= 0) {
         state.enemies.splice(index, 1);
+        continue;
+      }
+
+      if (enemy.preventContactDamage) {
         continue;
       }
 
@@ -657,6 +973,10 @@ export function createGame({
       return;
     }
 
+    if (state.tutorial.active) {
+      return;
+    }
+
     if (state.waveState === 'intermission') {
       state.nextWaveCountdownMs = Math.max(0, state.nextWaveCountdownMs - deltaMs);
 
@@ -680,15 +1000,27 @@ export function createGame({
 
   function getSnapshot(now = performance.now()) {
     const freezeRemainingMs = state.player.freezeCastMs;
-    const betweenWaves = !state.gameOver && state.waveState === 'intermission';
+    const tutorial = getTutorialSnapshot();
+    const betweenWaves = !state.gameOver && !tutorial.active && state.waveState === 'intermission';
     const threatsRemaining = Math.max(state.waveSize - state.waveResolved, 0);
-    const healAvailable = !state.gameOver && state.waveState === 'combat' && !state.healUsedThisWave;
+    const healAvailable = tutorial.active
+      ? tutorial.key === 'heal-lesson'
+      : !state.gameOver && state.waveState === 'combat' && !state.healUsedThisWave;
     const waveBanner = getWaveBannerState(state);
     const gameStateLabel = state.gameOver
       ? 'Game over'
+      : tutorial.active
+        ? 'Tutorial'
       : betweenWaves
         ? 'Between waves'
         : 'In combat';
+    const phaseDisplayLabel = tutorial.active
+      ? tutorial.progressLabel
+      : state.gameOver
+        ? 'Game over'
+        : betweenWaves
+          ? `Intermission · ${formatDuration(state.nextWaveCountdownMs)}`
+          : `Combat · ${threatsRemaining} left`;
 
     return {
       playerHp: state.player.hp,
@@ -703,19 +1035,26 @@ export function createGame({
       nextWaveCountdownMs: betweenWaves ? state.nextWaveCountdownMs : 0,
       healAvailable,
       healUsedThisWave: state.healUsedThisWave,
-      healStatusLabel: state.gameOver
-        ? 'Stopped'
-        : state.waveState !== 'combat'
-          ? 'Ready next wave'
-          : state.healUsedThisWave
-            ? 'Used this wave'
-            : 'Ready this wave',
+      healStatusLabel: tutorial.active
+        ? tutorial.key === 'heal-lesson'
+          ? 'Cast it now'
+          : 'Tutorial lesson'
+        : state.gameOver
+          ? 'Stopped'
+          : state.waveState !== 'combat'
+            ? 'Ready next wave'
+            : state.healUsedThisWave
+              ? 'Used this wave'
+              : 'Ready this wave',
       freezeRemainingMs,
       freezeActive: freezeRemainingMs > 0,
       waveBanner,
       gameOver: state.gameOver,
       gameStateLabel,
+      waveDisplayLabel: tutorial.active ? 'Tutorial' : `Wave ${state.currentWave}`,
+      phaseDisplayLabel,
       feedText: state.feedText,
+      tutorial,
     };
   }
 
@@ -1392,6 +1731,7 @@ export function createGame({
       updateEnemies(deltaSeconds, now);
       updateProjectiles(deltaSeconds, now);
       updateWaveState(deltaMs, now);
+      updateTutorialProgress(now);
     }
 
     updateEffects(deltaSeconds);
@@ -1401,8 +1741,25 @@ export function createGame({
   }
 
   function castSpell(spellName, now = performance.now()) {
+    const tutorialStep = getTutorialStep();
+
     if (spellName === 'Heal') {
-      if (state.waveState !== 'combat') {
+      const tutorialAllowsHeal = state.tutorial.active
+        && tutorialStep
+        && (tutorialStep.action === 'cast_any' || tutorialStep.action === 'heal');
+
+      if (state.tutorial.active && !tutorialAllowsHeal) {
+        const result = {
+          accepted: false,
+          headline: 'Heal held in reserve',
+          detail: 'The tutorial saves Heal for a safe utility lesson near the end.',
+        };
+        pushBattleEvent(result.headline, result.detail);
+        onStateChange(getSnapshot(now));
+        return result;
+      }
+
+      if (!state.tutorial.active && state.waveState !== 'combat') {
         const result = {
           accepted: false,
           headline: 'Heal unavailable',
@@ -1413,7 +1770,7 @@ export function createGame({
         return result;
       }
 
-      if (state.healUsedThisWave) {
+      if (!state.tutorial.active && state.healUsedThisWave) {
         const result = {
           accepted: false,
           headline: 'Heal unavailable',
@@ -1431,7 +1788,7 @@ export function createGame({
     });
 
     if (result.accepted) {
-      if (spellName === 'Heal') {
+      if (spellName === 'Heal' && !state.tutorial.active) {
         state.healUsedThisWave = true;
       }
 
@@ -1449,19 +1806,82 @@ export function createGame({
           }
         }
       }
+
+      if (state.tutorial.active && tutorialStep?.action === 'cast_any') {
+        queueTutorialAdvance(state.tutorial.stepIndex + 1, now, 320);
+      }
+
+      if (state.tutorial.active && tutorialStep?.action === 'heal' && spellName === 'Heal') {
+        queueTutorialAdvance(TUTORIAL_STEPS.length, now, 560);
+      }
     }
 
     onStateChange(getSnapshot(now));
     return result;
   }
 
-  function restart() {
+  function continueTutorial(now = performance.now()) {
+    if (!state.tutorial.active) {
+      return {
+        accepted: false,
+        headline: 'Tutorial inactive',
+        detail: 'The tutorial panel is not active right now.',
+      };
+    }
+
+    const tutorialStep = getTutorialStep();
+
+    if (tutorialStep?.action !== 'continue') {
+      return {
+        accepted: false,
+        headline: 'Follow the objective',
+        detail: tutorialStep?.objective ?? 'This lesson advances after the required spell action.',
+      };
+    }
+
+    enterTutorialStep(state.tutorial.stepIndex + 1, now);
+    onStateChange(getSnapshot(now));
+
+    return {
+      accepted: true,
+      headline: 'Tutorial advanced',
+      detail: 'The next lesson is ready.',
+    };
+  }
+
+  function skipTutorial(now = performance.now()) {
+    if (!state.tutorial.active) {
+      return {
+        accepted: false,
+        headline: 'Tutorial inactive',
+        detail: 'The tutorial is not currently running.',
+      };
+    }
+
+    beginMainGame(now, { skipped: true });
+    onStateChange(getSnapshot(now));
+
+    return {
+      accepted: true,
+      headline: 'Tutorial skipped',
+      detail: 'Wave 1 is gathering now.',
+    };
+  }
+
+  function restart({ runTutorial = false } = {}) {
     const freshState = createInitialState();
     Object.assign(state, freshState);
     syncLayout();
-    state.feedText = 'Battle reset. Wave 1 is gathering. Read the aura: red for Fireball, yellow for Lightning, blue-cyan for Freeze.';
-    onBattleEvent('Battle reset. Wave 1 begins after a short pause.');
     const now = performance.now();
+
+    if (runTutorial) {
+      startTutorial(now);
+      onBattleEvent('Tutorial started. Learn the spells, then the real battle begins.');
+    } else {
+      state.feedText = 'Battle reset. Wave 1 is gathering. Read the aura: red for Fireball, yellow for Lightning, blue-cyan for Freeze.';
+      onBattleEvent('Battle reset. Wave 1 begins after a short pause.');
+    }
+
     render(now);
     onStateChange(getSnapshot(now));
   }
@@ -1493,9 +1913,11 @@ export function createGame({
 
   return {
     castSpell,
+    continueTutorial,
     dispose,
     getState: () => getSnapshot(performance.now()),
     restart,
+    skipTutorial,
     start,
   };
 }

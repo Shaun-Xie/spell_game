@@ -716,7 +716,7 @@ function startBattleFromMenu() {
   ui.setMainMenuVisible(false);
   ui.setInstructionMenuVisible(true);
   instructionMenuVisible = true;
-  ui.setDebugMessage('Spell briefing opened. Press X when you are ready to begin.');
+  ui.setDebugMessage('Spell briefing opened. Press X or Begin Tutorial when you are ready.');
   ui.pushDebugMessage('Main menu dismissed. Spell briefing opened.');
 }
 
@@ -735,12 +735,44 @@ function beginBattleFromInstructions() {
   ui.setMainMenuVisible(false);
 
   if (!gameStarted) {
-    game.restart();
+    game.restart({ runTutorial: true });
     startGameLoop();
     gameStarted = true;
-    ui.setDebugMessage('Battle started. Wave 1 is gathering behind the ward.');
-    ui.pushDebugMessage('Spell briefing dismissed. Battle lane is now live.');
+    ui.setDebugMessage('Tutorial started. Follow the arena objective to learn the spell flow.');
+    ui.pushDebugMessage('Spell briefing dismissed. Guided tutorial started.');
   }
+}
+
+function continueBattleTutorial() {
+  if (!game || !ui) {
+    return;
+  }
+
+  const result = game.continueTutorial();
+
+  if (!result.accepted) {
+    ui.setDebugMessage(`${result.headline}. ${result.detail}`);
+    return;
+  }
+
+  ui.setDebugMessage('Tutorial advanced. Follow the next lesson objective.');
+  ui.pushDebugMessage('Tutorial advanced by user input.');
+}
+
+function skipBattleTutorial() {
+  if (!game || !ui) {
+    return;
+  }
+
+  const result = game.skipTutorial();
+
+  if (!result.accepted) {
+    ui.setDebugMessage(`${result.headline}. ${result.detail}`);
+    return;
+  }
+
+  ui.setDebugMessage('Tutorial skipped. Wave 1 is gathering now.');
+  ui.pushDebugMessage('Tutorial skipped by user input.');
 }
 
 async function boot() {
@@ -837,7 +869,7 @@ function restartBattle() {
     return;
   }
 
-  game.restart();
+  game.restart({ runTutorial: false });
   gameStarted = true;
   instructionMenuVisible = false;
   ui?.setMainMenuVisible(false);
@@ -868,11 +900,37 @@ function bindGlobalListeners() {
     beginBattleFromInstructions();
   });
 
+  ui.bindTutorialContinue(() => {
+    continueBattleTutorial();
+  });
+
+  ui.bindTutorialSkip(() => {
+    skipBattleTutorial();
+  });
+
   ui.bindGameRestart(() => {
     restartBattle();
   });
 
   window.addEventListener('keydown', (event) => {
+    const tutorialState = game?.getState().tutorial;
+
+    if (tutorialState?.active && (event.key === 's' || event.key === 'S')) {
+      event.preventDefault();
+      skipBattleTutorial();
+      return;
+    }
+
+    if (
+      tutorialState?.active
+      && tutorialState.canContinue
+      && (event.key === 'x' || event.key === 'X' || event.key === 'Enter' || event.key === ' ')
+    ) {
+      event.preventDefault();
+      continueBattleTutorial();
+      return;
+    }
+
     if (instructionMenuVisible && (event.key === 'x' || event.key === 'X')) {
       event.preventDefault();
       beginBattleFromInstructions();

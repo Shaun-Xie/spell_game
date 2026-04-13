@@ -1,0 +1,5 @@
+tutorial
+cleanup UI
+More unique enemies and faster wave scaling and difficulty
+Spellbook within view
+Easier to see corresponding spells
