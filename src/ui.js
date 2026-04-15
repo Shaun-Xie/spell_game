@@ -45,10 +45,10 @@ const ACTIVE_PRESENTATION = {
   spellbookBody:
     'Read the aura first: red means Fireball, yellow means Lightning, and blue-cyan means Freeze. Heal restores HP once per wave.',
   spellbook: {
-    fireball: { title: 'Fireball', hint: 'Closed fist · Red aura' },
-    freeze: { title: 'Freeze', hint: 'Thumbs up · Blue-cyan aura' },
-    lightning: { title: 'Lightning', hint: 'Index finger only · Yellow aura' },
-    heal: { title: 'Heal', hint: 'Index + middle · Restore HP' },
+    fireball: { title: 'Fireball', hint: '✊' },
+    freeze: { title: 'Freeze', hint: '👍' },
+    lightning: { title: 'Lightning', hint: '☝' },
+    heal: { title: 'Heal', hint: '✌' },
   },
 };
 
@@ -134,6 +134,8 @@ export function createUI() {
 
   const refs = {
     appShell: document.getElementById('appShell'),
+    fullscreenToggleButton: document.getElementById('fullscreenToggleButton'),
+    fullscreenToggleLabel: document.getElementById('fullscreenToggleLabel'),
     gameCanvas: document.getElementById('gameCanvas'),
     gameStateBadge: document.getElementById('gameStateBadge'),
     arenaHpValue: document.getElementById('arenaHpValue'),
@@ -218,6 +220,8 @@ export function createUI() {
 
   const requiredRefKeys = [
     'appShell',
+    'fullscreenToggleButton',
+    'fullscreenToggleLabel',
     'gameCanvas',
     'gameStateBadge',
     'arenaHpValue',
@@ -476,6 +480,10 @@ export function createUI() {
     refs.tutorialSkipButton.addEventListener('click', handler);
   }
 
+  function bindFullscreenToggle(handler) {
+    refs.fullscreenToggleButton.addEventListener('click', handler);
+  }
+
   function bindGameStart(handler) {
     refs.mainMenuPlayButton.addEventListener('click', handler);
   }
@@ -492,6 +500,20 @@ export function createUI() {
   function setInstructionMenuVisible(visible) {
     refs.instructionOverlay.classList.toggle('is-hidden', !visible);
     refs.instructionOverlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  }
+
+  function setFullscreenState(active, supported = true) {
+    refs.fullscreenToggleButton.classList.toggle('hidden', !supported || active);
+    refs.fullscreenToggleButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+    refs.fullscreenToggleButton.setAttribute(
+      'aria-label',
+      active ? 'Fullscreen active. Press Escape to exit.' : 'Enter fullscreen',
+    );
+    refs.fullscreenToggleButton.title = active
+      ? 'Fullscreen active. Press Escape to exit.'
+      : 'Enter fullscreen';
+    refs.fullscreenToggleLabel.textContent = '⛶';
+    refs.appShell.classList.toggle('is-fullscreen', active);
   }
 
   function clearOverlay() {
@@ -703,6 +725,7 @@ export function createUI() {
 
   return {
     refs,
+    bindFullscreenToggle,
     bindGameStart,
     bindInstructionStart,
     bindGameRestart,
@@ -720,6 +743,7 @@ export function createUI() {
     setDebugMessage,
     setGestureMode,
     setHandStatus,
+    setFullscreenState,
     setInstructionMenuVisible,
     setMainMenuVisible,
     setModelStatus,

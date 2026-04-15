@@ -76,8 +76,8 @@ const TUTORIAL_STEPS = [
     title: 'Step 2 · Read The Aura',
     description: 'Aura color reveals the enemy weakness before you cast.',
     objective: 'Red means Fireball. Yellow means Lightning. Blue-cyan means Freeze.',
-    action: 'continue',
-    continueLabel: 'Continue',
+    action: 'auto',
+    autoAdvanceDelayMs: 1700,
     accentSpell: 'Neutral',
     highlights: [
       'Red aura -> Fireball',
@@ -141,6 +141,24 @@ const TUTORIAL_STEPS = [
       'Gesture: Index + middle',
       'Effect: Restores HP',
       'Limit: Once per wave',
+    ],
+  },
+  {
+    key: 'tutorial-complete',
+    title: 'Tutorial Complete',
+    description: 'You are ready for live waves: read the aura, answer with the matching spell, and save Heal for a rough moment.',
+    objective: 'Press Start Wave 1 when you are ready.',
+    action: 'continue',
+    continueLabel: 'Start Wave 1',
+    accentSpell: 'Neutral',
+    progressLabel: 'Ready',
+    showSkip: false,
+    completed: true,
+    highlights: [
+      'Red -> Fireball',
+      'Yellow -> Lightning',
+      'Blue-cyan -> Freeze',
+      'Heal: once per wave',
     ],
   },
 ];
@@ -433,6 +451,7 @@ export function createGame({
     state.tutorial.pendingStepIndex = null;
     state.tutorial.pendingAdvanceAt = 0;
     state.tutorial.targetEnemyId = null;
+    state.tutorial.completed = Boolean(step.completed);
     state.waveState = 'tutorial';
     state.spawnCooldownMs = 0;
     state.nextWaveCountdownMs = 0;
@@ -455,6 +474,14 @@ export function createGame({
 
     if (step.action === 'enemy') {
       spawnTutorialEnemy(step.enemyType, now);
+    }
+
+    if (step.action === 'auto') {
+      queueTutorialAdvance(
+        state.tutorial.stepIndex + 1,
+        now,
+        step.autoAdvanceDelayMs ?? TUTORIAL_SETTINGS.stepAdvanceDelayMs,
+      );
     }
 
     pushBattleEvent(step.title, step.objective);
@@ -530,8 +557,9 @@ export function createGame({
       highlights: step.highlights ?? [],
       canContinue: step.action === 'continue',
       continueLabel: step.continueLabel ?? 'Continue',
-      showSkip: true,
-      progressLabel: `Lesson ${state.tutorial.stepIndex + 1} / ${TUTORIAL_STEPS.length}`,
+      showSkip: step.showSkip ?? true,
+      progressLabel:
+        step.progressLabel ?? `Lesson ${state.tutorial.stepIndex + 1} / ${TUTORIAL_STEPS.length}`,
     };
   }
 
@@ -1812,7 +1840,7 @@ export function createGame({
       }
 
       if (state.tutorial.active && tutorialStep?.action === 'heal' && spellName === 'Heal') {
-        queueTutorialAdvance(TUTORIAL_STEPS.length, now, 560);
+        queueTutorialAdvance(state.tutorial.stepIndex + 1, now, 560);
       }
     }
 
@@ -1839,7 +1867,21 @@ export function createGame({
       };
     }
 
-    enterTutorialStep(state.tutorial.stepIndex + 1, now);
+    const nextStepIndex = state.tutorial.stepIndex + 1;
+
+    if (nextStepIndex >= TUTORIAL_STEPS.length) {
+      beginMainGame(now);
+      onStateChange(getSnapshot(now));
+
+      return {
+        accepted: true,
+        headline: 'Tutorial complete',
+        detail: 'Wave 1 is gathering now.',
+      };
+    } else {
+      enterTutorialStep(nextStepIndex, now);
+    }
+
     onStateChange(getSnapshot(now));
 
     return {

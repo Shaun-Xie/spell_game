@@ -122,6 +122,17 @@
                 >
                   <canvas id="gameCanvas" class="arena-canvas absolute inset-0 z-0 h-full w-full"></canvas>
 
+                  <button
+                    id="fullscreenToggleButton"
+                    type="button"
+                    class="fullscreen-toggle"
+                    aria-pressed="false"
+                    aria-label="Enter fullscreen"
+                    title="Enter fullscreen"
+                  >
+                    <span id="fullscreenToggleLabel" class="fullscreen-toggle__symbol" aria-hidden="true">⛶</span>
+                  </button>
+
                   <div id="mainMenuOverlay" class="main-menu-overlay" aria-hidden="false">
                     <div class="main-menu-overlay__card">
                       <p class="main-menu-overlay__eyebrow">Arcane Battle Demo</p>
@@ -143,7 +154,7 @@
                   <div id="instructionOverlay" class="instruction-overlay is-hidden" aria-hidden="true">
                     <div class="instruction-overlay__card">
                       <p class="instruction-overlay__eyebrow">Spellcasting Briefing</p>
-                      <h3 class="instruction-overlay__title">One-Hand Arcane Rules</h3>
+                      <h3 class="instruction-overlay__title">Mage Hands Rules</h3>
                       <p class="instruction-overlay__hint">
                         The battle begins with a short guided tutorial that teaches the signs, the aura rules, and the enemy matchups.
                       </p>
@@ -401,28 +412,28 @@
                       <div class="spell-card__icon"><i data-lucide="flame" class="h-5 w-5"></i></div>
                       <div>
                         <p id="spellCardFireballTitle" class="spell-card__title">Fireball</p>
-                        <p id="spellCardFireballHint" class="spell-card__hint">Closed fist · Red aura</p>
+                        <p id="spellCardFireballHint" class="spell-card__hint spell-card__hint--emoji">✊</p>
                       </div>
                     </article>
                     <article class="spell-card spell-card--compact spell-card--lightning">
                       <div class="spell-card__icon"><i data-lucide="zap" class="h-5 w-5"></i></div>
                       <div>
                         <p id="spellCardLightningTitle" class="spell-card__title">Lightning</p>
-                        <p id="spellCardLightningHint" class="spell-card__hint">Index finger only · Yellow aura</p>
+                        <p id="spellCardLightningHint" class="spell-card__hint spell-card__hint--emoji">☝</p>
                       </div>
                     </article>
                     <article class="spell-card spell-card--compact spell-card--freeze">
                       <div class="spell-card__icon"><i data-lucide="snowflake" class="h-5 w-5"></i></div>
                       <div>
                         <p id="spellCardFreezeTitle" class="spell-card__title">Freeze</p>
-                        <p id="spellCardFreezeHint" class="spell-card__hint">Thumbs up · Blue-cyan aura</p>
+                        <p id="spellCardFreezeHint" class="spell-card__hint spell-card__hint--emoji">👍</p>
                       </div>
                     </article>
                     <article class="spell-card spell-card--compact spell-card--heal">
                       <div class="spell-card__icon"><i data-lucide="heart-pulse" class="h-5 w-5"></i></div>
                       <div>
                         <p id="spellCardHealTitle" class="spell-card__title">Heal</p>
-                        <p id="spellCardHealHint" class="spell-card__hint">Index + middle · Once per wave</p>
+                        <p id="spellCardHealHint" class="spell-card__hint spell-card__hint--emoji">✌</p>
                       </div>
                     </article>
                   </div>

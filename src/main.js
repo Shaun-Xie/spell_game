@@ -24,6 +24,23 @@ let startupNoticeEscalationId = null;
 let gameStarted = false;
 let instructionMenuVisible = false;
 
+function fullscreenSupported() {
+  return Boolean(
+    document.fullscreenEnabled
+    && ui?.refs?.appShell
+    && typeof ui.refs.appShell.requestFullscreen === 'function'
+    && typeof document.exitFullscreen === 'function',
+  );
+}
+
+function syncFullscreenUi() {
+  if (!ui) {
+    return;
+  }
+
+  ui.setFullscreenState(document.fullscreenElement === ui.refs.appShell, fullscreenSupported());
+}
+
 const startupPhases = {
   boot: { status: 'idle', detail: '' },
   ui: { status: 'idle', detail: '' },
@@ -540,6 +557,7 @@ function createSubsystems() {
     logStartupPhase('ui', 'Creating the interface shell.');
     ui = createUI();
     ui.setGestureMode();
+    syncFullscreenUi();
     setStartupPhase('ui', 'ready', 'Interface shell ready.', { pushLog: true });
     bindGlobalListeners();
   } catch (error) {
@@ -755,8 +773,8 @@ function continueBattleTutorial() {
     return;
   }
 
-  ui.setDebugMessage('Tutorial advanced. Follow the next lesson objective.');
-  ui.pushDebugMessage('Tutorial advanced by user input.');
+  ui.setDebugMessage(`${result.headline}. ${result.detail}`);
+  ui.pushDebugMessage(`${result.headline} by user input.`);
 }
 
 function skipBattleTutorial() {
@@ -773,6 +791,31 @@ function skipBattleTutorial() {
 
   ui.setDebugMessage('Tutorial skipped. Wave 1 is gathering now.');
   ui.pushDebugMessage('Tutorial skipped by user input.');
+}
+
+async function toggleFullscreen() {
+  if (!ui?.refs?.appShell) {
+    return;
+  }
+
+  if (!fullscreenSupported()) {
+    ui.setDebugMessage('Fullscreen is not available in this browser.');
+    return;
+  }
+
+  try {
+    if (document.fullscreenElement === ui.refs.appShell) {
+      await document.exitFullscreen();
+    } else {
+      await ui.refs.appShell.requestFullscreen();
+    }
+  } catch (error) {
+    console.error('[Mage Hands] Fullscreen toggle failed.', error);
+    ui.setDebugMessage('Fullscreen could not be toggled in this browser.');
+    ui.pushDebugMessage('Fullscreen toggle failed.');
+  } finally {
+    syncFullscreenUi();
+  }
 }
 
 async function boot() {
@@ -912,6 +955,14 @@ function bindGlobalListeners() {
     restartBattle();
   });
 
+  ui.bindFullscreenToggle(() => {
+    toggleFullscreen().catch((error) => {
+      console.error('[Mage Hands] Fullscreen toggle failed.', error);
+      ui.setDebugMessage('Fullscreen could not be toggled in this browser.');
+      ui.pushDebugMessage('Fullscreen toggle failed unexpectedly.');
+    });
+  });
+
   window.addEventListener('keydown', (event) => {
     const tutorialState = game?.getState().tutorial;
 
@@ -940,6 +991,10 @@ function bindGlobalListeners() {
     if ((event.key === 'r' || event.key === 'R' || event.key === 'Enter') && game?.getState().gameOver) {
       restartBattle();
     }
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    syncFullscreenUi();
   });
 
   window.addEventListener('beforeunload', () => {
