@@ -7,6 +7,10 @@
       name="description"
       content="Mage Hands is a browser-based spellcasting battle prototype that turns webcam gestures into playable combat."
     />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#6ee7f9" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="theme-color" content="#050914" />
     <title>Mage Hands</title>
   </head>
@@ -133,6 +137,16 @@
                     <span id="fullscreenToggleLabel" class="fullscreen-toggle__symbol" aria-hidden="true">⛶</span>
                   </button>
 
+                  <div
+                    id="fullscreenHint"
+                    class="fullscreen-hint"
+                    role="status"
+                    aria-live="polite"
+                    aria-hidden="true"
+                  >
+                    Press Esc to exit full screen
+                  </div>
+
                   <div id="mainMenuOverlay" class="main-menu-overlay" aria-hidden="false">
                     <div class="main-menu-overlay__card">
                       <p class="main-menu-overlay__eyebrow">Arcane Battle Demo</p>
@@ -156,7 +170,7 @@
                       <p class="instruction-overlay__eyebrow">Spellcasting Briefing</p>
                       <h3 class="instruction-overlay__title">Mage Hands Rules</h3>
                       <p class="instruction-overlay__hint">
-                        The battle begins with a short guided tutorial that teaches the signs, the aura rules, and the enemy matchups.
+                        The battle begins with a short guided tutorial that teaches the signs, the aura rules, and the later combo enemies that show a live two-step sequence above them.
                       </p>
 
                       <div class="instruction-overlay__content-grid">
@@ -332,6 +346,12 @@
                       <p id="tutorialObjective" class="tutorial-panel__objective">
                         Cast any mapped spell to continue.
                       </p>
+
+                      <div
+                        id="tutorialSequence"
+                        class="tutorial-sequence hidden"
+                        aria-label="Required gesture sequence"
+                      ></div>
 
                       <ul id="tutorialHighlights" class="tutorial-panel__highlights">
                         <li class="tutorial-panel__chip">Closed fist -> Fireball</li>

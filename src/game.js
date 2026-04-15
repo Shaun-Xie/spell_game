@@ -1,11 +1,22 @@
 import {
-  ENEMY_ARCHETYPE_KEYS,
+  SPELL_THEME,
   clamp,
   formatDuration,
-  getEnemyArchetype,
   randomRange,
   rgbaFromRgbString,
 } from './utils.js';
+import {
+  ENEMY_ARCHETYPE_KEYS,
+  getEnemyArchetype,
+  getEnemySequence,
+  getEnemySpawnPool,
+  getWaveComboLimit,
+  isComboEnemyType,
+} from './enemies.js';
+import {
+  createGestureIconSprites,
+  getGestureIconSprite,
+} from './gestureIcons.js';
 import {
   SPELL_CONFIG,
   applySpellCast,
@@ -92,7 +103,6 @@ const TUTORIAL_STEPS = [
     objective: 'Cast Fireball to defeat the Briar Beast.',
     action: 'enemy',
     enemyType: 'EMBER',
-    expectedSpell: 'Fireball',
     accentSpell: 'Fireball',
     highlights: [
       'Enemy: Briar Beast',
@@ -107,7 +117,6 @@ const TUTORIAL_STEPS = [
     objective: 'Cast Lightning to defeat the Rune Construct.',
     action: 'enemy',
     enemyType: 'STORM',
-    expectedSpell: 'Lightning',
     accentSpell: 'Lightning',
     highlights: [
       'Enemy: Rune Construct',
@@ -122,7 +131,6 @@ const TUTORIAL_STEPS = [
     objective: 'Cast Freeze to defeat the Shadow Wraith.',
     action: 'enemy',
     enemyType: 'FROST',
-    expectedSpell: 'Freeze',
     accentSpell: 'Freeze',
     highlights: [
       'Enemy: Shadow Wraith',
@@ -131,8 +139,50 @@ const TUTORIAL_STEPS = [
     ],
   },
   {
+    key: 'ember-conduit',
+    title: 'Step 6 · Ember Conduit',
+    description: 'Combo enemies need ordered hits. Wake the conduit with heat, then overload it with a spark.',
+    objective: 'Cast Fireball first, then Lightning, to defeat the Ember Conduit.',
+    action: 'enemy',
+    enemyType: 'EMBER_CONDUIT',
+    accentSpell: 'Fireball',
+    highlights: [
+      'Enemy: Ember Conduit',
+      'Sequence: Fireball -> Lightning',
+      'Wrong spell on phase 2 resets the combo',
+    ],
+  },
+  {
+    key: 'tempest-bloom',
+    title: 'Step 7 · Tempest Bloom',
+    description: 'Some combo foes reverse the order. Charge the bloom first, then ignite the opened core.',
+    objective: 'Cast Lightning first, then Fireball, to defeat the Tempest Bloom.',
+    action: 'enemy',
+    enemyType: 'TEMPEST_BLOOM',
+    accentSpell: 'Lightning',
+    highlights: [
+      'Enemy: Tempest Bloom',
+      'Sequence: Lightning -> Fireball',
+      'Watch the highlighted step above the enemy',
+    ],
+  },
+  {
+    key: 'frost-volt',
+    title: 'Step 8 · Frost Volt',
+    description: 'Freeze can prime a combo too. Crack the shell with frost, then finish it with Lightning.',
+    objective: 'Cast Freeze first, then Lightning, to defeat the Frost Volt.',
+    action: 'enemy',
+    enemyType: 'FROST_VOLT',
+    accentSpell: 'Freeze',
+    highlights: [
+      'Enemy: Frost Volt',
+      'Sequence: Freeze -> Lightning',
+      'Phase 1 changes the enemy and the live sequence badge',
+    ],
+  },
+  {
     key: 'heal-lesson',
-    title: 'Step 6 · Heal',
+    title: 'Step 9 · Heal',
     description: 'Heal restores HP and refreshes once each real combat wave.',
     objective: 'Cast Heal now to restore the mage.',
     action: 'heal',
@@ -146,7 +196,7 @@ const TUTORIAL_STEPS = [
   {
     key: 'tutorial-complete',
     title: 'Tutorial Complete',
-    description: 'You are ready for live waves: read the aura, answer with the matching spell, and save Heal for a rough moment.',
+    description: 'You are ready for live waves: read the aura, follow combo sequences in order, and save Heal for a rough moment.',
     objective: 'Press Start Wave 1 when you are ready.',
     action: 'continue',
     continueLabel: 'Start Wave 1',
@@ -158,6 +208,7 @@ const TUTORIAL_STEPS = [
       'Red -> Fireball',
       'Yellow -> Lightning',
       'Blue-cyan -> Freeze',
+      'Combo foes show a live 2-step sequence',
       'Heal: once per wave',
     ],
   },
@@ -217,6 +268,7 @@ function createInitialState() {
     waveSize: openingWave.enemyCount,
     waveSpawned: 0,
     waveResolved: 0,
+    waveComboSpawned: 0,
     waveState: 'intermission',
     healUsedThisWave: false,
     nextWaveCountdownMs: WAVE_SETTINGS.initialCountdownMs,
@@ -281,6 +333,7 @@ function getWaveProfile(waveNumber) {
         + Math.floor(waveIndex / WAVE_SETTINGS.maxConcurrentEnemiesIncreaseEvery),
       WAVE_SETTINGS.maxConcurrentEnemiesCap,
     ),
+    comboLimit: getWaveComboLimit(waveNumber),
   };
 }
 
@@ -351,6 +404,7 @@ export function createGame({
   let viewportWidth = 960;
   let viewportHeight = 540;
   let layout = resolveLayout(viewportWidth, viewportHeight);
+  const gestureIconSprites = createGestureIconSprites();
 
   function pushBattleEvent(headline, detail = '') {
     const message = detail ? `${headline}. ${detail}` : headline;
@@ -536,6 +590,47 @@ export function createGame({
     enterTutorialStep(nextStepIndex, now);
   }
 
+  function getEnemyProgress(enemy) {
+    return clamp(enemy.sequenceProgress ?? 0, 0, enemy.sequence.length);
+  }
+
+  function getEnemyCurrentSpell(enemy) {
+    const progress = getEnemyProgress(enemy);
+    const currentIndex = Math.min(progress, enemy.sequence.length - 1);
+
+    return enemy.sequence[currentIndex] ?? enemy.sequence[0] ?? 'Neutral';
+  }
+
+  function getEnemySequenceStatuses(enemy) {
+    const progress = getEnemyProgress(enemy);
+
+    return enemy.sequence.map((spellName, index) => ({
+      spellName,
+      status: index < progress ? 'complete' : index === progress ? 'current' : 'future',
+    }));
+  }
+
+  function getTutorialObjective(step, targetEnemy) {
+    if (step.action !== 'enemy') {
+      return step.objective;
+    }
+
+    const sequence = targetEnemy?.sequence ?? getEnemySequence(step.enemyType);
+
+    if (sequence.length <= 1) {
+      return step.objective;
+    }
+
+    if (!targetEnemy || getEnemyProgress(targetEnemy) === 0) {
+      return step.objective;
+    }
+
+    const nextSpell = getEnemyCurrentSpell(targetEnemy);
+    const label = getEnemyArchetype(step.enemyType).label;
+
+    return `Phase 2 is active. Cast ${nextSpell} now to finish the ${label}.`;
+  }
+
   function getTutorialSnapshot() {
     if (!state.tutorial.active) {
       return { active: false };
@@ -547,14 +642,26 @@ export function createGame({
       return { active: false };
     }
 
+    const targetEnemy = state.enemies.find((enemy) => enemy.id === state.tutorial.targetEnemyId) ?? null;
+    const sequence = step.action === 'enemy'
+      ? targetEnemy?.sequence ?? getEnemySequence(step.enemyType)
+      : [];
+    const sequenceProgress = targetEnemy
+      ? getEnemyProgress(targetEnemy)
+      : step.action === 'enemy' && state.tutorial.pendingStepIndex != null
+        ? sequence.length
+        : 0;
+
     return {
       active: true,
       key: step.key,
       title: step.title,
       description: step.description,
-      objective: step.objective,
+      objective: getTutorialObjective(step, targetEnemy),
       accentSpell: step.accentSpell ?? 'Neutral',
       highlights: step.highlights ?? [],
+      sequence,
+      sequenceProgress,
       canContinue: step.action === 'continue',
       continueLabel: step.continueLabel ?? 'Continue',
       showSkip: step.showSkip ?? true,
@@ -572,14 +679,28 @@ export function createGame({
   }
 
   function getEnemyY(enemy, now = performance.now()) {
-    if (enemy.type === 'FROST') {
+    const motionStyle = getEnemyArchetype(enemy.type).motionStyle ?? 'default';
+
+    if (motionStyle === 'frost') {
       return layout.laneYs[enemy.laneIndex]
         + Math.sin(now / 230 + enemy.bobOffset) * 8
         + Math.cos(now / 510 + enemy.bobOffset * 0.7) * 3;
     }
 
-    if (enemy.type === 'STORM') {
+    if (motionStyle === 'storm') {
       return layout.laneYs[enemy.laneIndex] + Math.sin(now / 440 + enemy.bobOffset) * 3;
+    }
+
+    if (motionStyle === 'hover') {
+      return layout.laneYs[enemy.laneIndex]
+        + Math.sin(now / 320 + enemy.bobOffset) * 9
+        + Math.cos(now / 640 + enemy.bobOffset * 0.9) * 4;
+    }
+
+    if (motionStyle === 'heavy') {
+      return layout.laneYs[enemy.laneIndex]
+        + Math.sin(now / 320 + enemy.bobOffset) * 3
+        + Math.sin(now / 760 + enemy.bobOffset * 0.7) * 1.6;
     }
 
     return layout.laneYs[enemy.laneIndex]
@@ -587,29 +708,51 @@ export function createGame({
       + Math.sin(now / 610 + enemy.bobOffset * 1.2) * 2;
   }
 
+  function chooseEnemyTypeForWave(waveProfile) {
+    const allowCombos = state.waveComboSpawned < waveProfile.comboLimit;
+    const spawnPool = getEnemySpawnPool(state.currentWave, { allowCombos });
+    const totalWeight = spawnPool.reduce((sum, entry) => sum + entry.weight, 0);
+    let threshold = randomRange(0, totalWeight || 1);
+
+    for (const entry of spawnPool) {
+      threshold -= entry.weight;
+
+      if (threshold <= 0) {
+        return entry.key;
+      }
+    }
+
+    return spawnPool.at(-1)?.key ?? ENEMY_ARCHETYPE_KEYS[0];
+  }
+
   function createEnemy(now, waveProfile, options = {}) {
     const laneIndex = Number.isInteger(options.laneIndex)
       ? clamp(options.laneIndex, 0, layout.laneYs.length - 1)
       : Math.floor(randomRange(0, layout.laneYs.length));
     const typeKey = options.typeKey
-      ?? ENEMY_ARCHETYPE_KEYS[Math.floor(randomRange(0, ENEMY_ARCHETYPE_KEYS.length))];
+      ?? chooseEnemyTypeForWave(waveProfile);
     const archetype = getEnemyArchetype(typeKey);
+    const sequence = getEnemySequence(typeKey);
 
     return {
       id: state.nextEnemyId++,
       type: archetype.key,
-      weaknessSpell: archetype.spell,
+      weaknessSpell: sequence[0] ?? 'Neutral',
+      sequence,
+      sequenceProgress: 0,
+      isCombo: isComboEnemyType(typeKey),
       x: options.spawnX ?? (layout.spawnX + randomRange(0, viewportWidth * 0.08)),
       y: layout.laneYs[laneIndex],
       laneIndex,
       radius: GAME_SETTINGS.enemyRadius,
       speed: options.speed ?? randomRange(waveProfile.enemySpeedMin, waveProfile.enemySpeedMax),
-      hp: 1,
-      maxHp: 1,
+      hp: sequence.length,
+      maxHp: sequence.length,
       bobOffset: randomRange(0, Math.PI * 2),
       hitFlash: 0,
       hitFlashMs: 0,
       hitFlashColor: archetype.rgb,
+      phasePulseMs: 0,
       spawnFlashMs: 260,
       tutorialStopX: options.tutorialStopX ?? null,
       preventContactDamage: Boolean(options.preventContactDamage),
@@ -637,6 +780,9 @@ export function createGame({
     const archetype = getEnemyArchetype(enemy.type);
     state.enemies.push(enemy);
     state.waveSpawned += 1;
+    if (enemy.isCombo) {
+      state.waveComboSpawned += 1;
+    }
     state.particles.push(
       ...createBurstParticles({
         x: enemy.x,
@@ -720,11 +866,7 @@ export function createGame({
     if (isTutorialEnemy) {
       const tutorialStep = getTutorialStep();
 
-      if (
-        tutorialStep?.action === 'enemy'
-        && tutorialStep.expectedSpell === spellName
-        && enemy.id === state.tutorial.targetEnemyId
-      ) {
+      if (tutorialStep?.action === 'enemy' && enemy.id === state.tutorial.targetEnemyId) {
         state.tutorial.targetEnemyId = null;
         queueTutorialAdvance(state.tutorial.stepIndex + 1, now);
       }
@@ -736,6 +878,7 @@ export function createGame({
     state.nextWaveCountdownMs = 0;
     state.waveSpawned = 0;
     state.waveResolved = 0;
+    state.waveComboSpawned = 0;
     state.healUsedThisWave = false;
     state.spawnCooldownMs = 0;
     state.rings.push(
@@ -765,6 +908,7 @@ export function createGame({
     state.waveSize = nextProfile.enemyCount;
     state.waveSpawned = 0;
     state.waveResolved = 0;
+    state.waveComboSpawned = 0;
     state.spawnCooldownMs = 0;
     state.nextWaveCountdownMs = WAVE_SETTINGS.intermissionDurationMs;
     state.waveBannerLabel = 'NEXT WAVE';
@@ -792,21 +936,52 @@ export function createGame({
     const impactColor = getSpellImpactColor(spellName);
     const impactX = enemy.x;
     const impactY = getEnemyY(enemy, now);
+    const requiredSpell = getEnemyCurrentSpell(enemy);
 
     enemy.hitFlash = 1;
     enemy.hitFlashMs = MATCH_SETTINGS.wrongSpellFlashMs;
     enemy.hitFlashColor = impactColor;
 
-    if (spellName === archetype.spell) {
-      enemy.hp = 0;
+    if (spellName === requiredSpell) {
+      enemy.sequenceProgress = Math.min(enemy.sequenceProgress + 1, enemy.sequence.length);
+      enemy.phasePulseMs = 720;
+      enemy.hp = Math.max(enemy.sequence.length - enemy.sequenceProgress, 0);
+
+      if (enemy.sequenceProgress >= enemy.sequence.length) {
+        enemy.hp = 0;
+        state.rings.push(
+          createRingEffect({
+            x: impactX,
+            y: impactY,
+            color: impactColor,
+            maxRadius: enemy.radius * 2.3,
+            lifeMs: 360,
+            lineWidth: 3,
+          }),
+        );
+        state.particles.push(
+          ...createBurstParticles({
+            x: impactX,
+            y: impactY,
+            color: impactColor,
+            count: 22,
+            minSpeed: 60,
+            maxSpeed: 220,
+            lifeMs: 420,
+          }),
+        );
+        return { matched: true, defeated: true };
+      }
+
+      const nextSpell = getEnemyCurrentSpell(enemy);
       state.rings.push(
         createRingEffect({
           x: impactX,
           y: impactY,
           color: impactColor,
-          maxRadius: enemy.radius * 2.3,
-          lifeMs: 360,
-          lineWidth: 3,
+          maxRadius: enemy.radius * 1.92,
+          lifeMs: 300,
+          lineWidth: 2.5,
         }),
       );
       state.particles.push(
@@ -814,16 +989,36 @@ export function createGame({
           x: impactX,
           y: impactY,
           color: impactColor,
-          count: 22,
-          minSpeed: 60,
-          maxSpeed: 220,
-          lifeMs: 420,
+          count: 14,
+          minSpeed: 42,
+          maxSpeed: 166,
+          lifeMs: 320,
         }),
       );
-      return { matched: true, defeated: true };
+      pushBattleEvent(
+        'Phase 1 complete',
+        `${archetype.label} shifted form. Cast ${nextSpell} next.`,
+      );
+      return {
+        matched: true,
+        defeated: false,
+        advanced: true,
+        nextSpell,
+      };
     }
 
-    enemy.x = Math.min(enemy.x + MATCH_SETTINGS.wrongSpellPushbackPx, viewportWidth - enemy.radius * 0.7);
+    const shouldResetCombo = enemy.sequenceProgress > 0;
+
+    if (shouldResetCombo) {
+      enemy.sequenceProgress = 0;
+      enemy.hp = enemy.sequence.length;
+      enemy.phasePulseMs = 420;
+    }
+
+    enemy.x = Math.min(
+      enemy.x + MATCH_SETTINGS.wrongSpellPushbackPx,
+      viewportWidth - enemy.radius * 0.7,
+    );
     state.rings.push(
       createRingEffect({
         x: impactX,
@@ -856,8 +1051,13 @@ export function createGame({
         lifeMs: 240,
       }),
     );
-    pushBattleEvent('Wrong spell', `${spellName} does not break the ${archetype.label} enemy.`);
-    return { matched: false, defeated: false };
+    pushBattleEvent(
+      shouldResetCombo ? 'Combo reset' : 'Wrong spell',
+      shouldResetCombo
+        ? `${spellName} broke the combo. Start again with ${enemy.sequence[0]}.`
+        : `${spellName} does not break the ${archetype.label} enemy.`,
+    );
+    return { matched: false, defeated: false, reset: shouldResetCombo };
   }
 
   function updateEnemies(deltaSeconds, now) {
@@ -871,6 +1071,7 @@ export function createGame({
       }
       enemy.hitFlashMs = Math.max(0, enemy.hitFlashMs - deltaSeconds * 1000);
       enemy.hitFlash = enemy.hitFlashMs > 0 ? enemy.hitFlashMs / 180 : 0;
+      enemy.phasePulseMs = Math.max(0, enemy.phasePulseMs - deltaSeconds * 1000);
       enemy.spawnFlashMs = Math.max(0, enemy.spawnFlashMs - deltaSeconds * 1000);
 
       if (enemy.hp <= 0) {
@@ -1163,6 +1364,163 @@ export function createGame({
     context.fillRect(x, y, width * progress, 6);
   }
 
+  function traceRoundedRect(x, y, width, height, radius) {
+    const safeRadius = Math.min(radius, width / 2, height / 2);
+    context.beginPath();
+    context.moveTo(x + safeRadius, y);
+    context.lineTo(x + width - safeRadius, y);
+    context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+    context.lineTo(x + width, y + height - safeRadius);
+    context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+    context.lineTo(x + safeRadius, y + height);
+    context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+    context.lineTo(x, y + safeRadius);
+    context.quadraticCurveTo(x, y, x + safeRadius, y);
+    context.closePath();
+  }
+
+  function renderEnemyGestureBadge(enemy, y, now) {
+    const steps = getEnemySequenceStatuses(enemy);
+    const currentSpell = getEnemyCurrentSpell(enemy);
+    const currentTheme = SPELL_THEME[currentSpell] ?? SPELL_THEME.Neutral;
+    const bob = Math.sin(now / 280 + enemy.bobOffset) * 1.4;
+    const stepSize = 22;
+    const connectorWidth = 14;
+    const iconSize = 14;
+    const contentWidth = steps.length * stepSize + Math.max(steps.length - 1, 0) * connectorWidth;
+    const badgeWidth = contentWidth + 16;
+    const badgeHeight = 34;
+    const badgeX = enemy.x - badgeWidth / 2;
+    const badgeY = y - enemy.radius - 58 + bob;
+
+    context.save();
+    context.shadowColor = rgbaFromRgbString(currentTheme.rgb, 0.24);
+    context.shadowBlur = 16;
+
+    const badgeGlow = context.createRadialGradient(
+      enemy.x,
+      badgeY + badgeHeight / 2,
+      badgeHeight * 0.16,
+      enemy.x,
+      badgeY + badgeHeight / 2,
+      badgeWidth * 0.7,
+    );
+    badgeGlow.addColorStop(0, rgbaFromRgbString(currentTheme.rgb, 0.28));
+    badgeGlow.addColorStop(1, rgbaFromRgbString(currentTheme.rgb, 0));
+    context.fillStyle = badgeGlow;
+    traceRoundedRect(badgeX - 10, badgeY - 6, badgeWidth + 20, badgeHeight + 12, 20);
+    context.fill();
+
+    context.shadowBlur = 0;
+    context.fillStyle = 'rgba(7, 15, 28, 0.92)';
+    traceRoundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 17);
+    context.fill();
+
+    context.strokeStyle = rgbaFromRgbString(currentTheme.rgb, 0.34);
+    context.lineWidth = 1.5;
+    traceRoundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 17);
+    context.stroke();
+
+    context.strokeStyle = rgbaFromRgbString('248 250 252', 0.16);
+    context.lineWidth = 1;
+    traceRoundedRect(badgeX + 3, badgeY + 3, badgeWidth - 6, badgeHeight - 6, 14);
+    context.stroke();
+
+    let cursorX = badgeX + 8;
+    const centerY = badgeY + badgeHeight / 2;
+
+    steps.forEach((step, index) => {
+      const icon = getGestureIconSprite(step.spellName, gestureIconSprites);
+      const theme = SPELL_THEME[step.spellName] ?? SPELL_THEME.Neutral;
+      const isCurrent = step.status === 'current';
+      const isComplete = step.status === 'complete';
+      const isFuture = step.status === 'future';
+      const keepFutureVisible = enemy.isCombo && steps.length === 2 && index === 1 && isFuture;
+
+      context.save();
+
+      if (isCurrent) {
+        context.shadowColor = rgbaFromRgbString(theme.rgb, 0.28);
+        context.shadowBlur = 10;
+      } else {
+        context.shadowBlur = 0;
+      }
+
+      context.fillStyle = isCurrent
+        ? rgbaFromRgbString(theme.rgb, 0.18)
+        : isComplete
+          ? rgbaFromRgbString(theme.rgb, 0.11)
+          : 'rgba(15, 23, 42, 0.92)';
+      traceRoundedRect(cursorX, centerY - stepSize / 2, stepSize, stepSize, 8);
+      context.fill();
+
+      context.shadowBlur = 0;
+      context.strokeStyle = isCurrent
+        ? rgbaFromRgbString(theme.rgb, 0.86)
+        : isComplete
+          ? rgbaFromRgbString(theme.rgb, 0.48)
+          : 'rgba(248, 250, 252, 0.14)';
+      context.lineWidth = isCurrent ? 1.5 : 1;
+      traceRoundedRect(cursorX, centerY - stepSize / 2, stepSize, stepSize, 8);
+      context.stroke();
+
+      if (icon?.image?.complete && icon.image.naturalWidth > 0) {
+        context.globalAlpha = keepFutureVisible ? 1 : isFuture ? 0.34 : isComplete ? 0.5 : 1;
+        context.drawImage(
+          icon.image,
+          cursorX + (stepSize - iconSize) / 2,
+          centerY - iconSize / 2,
+          iconSize,
+          iconSize,
+        );
+        context.globalAlpha = 1;
+      }
+
+      if (isComplete) {
+        context.strokeStyle = rgbaFromRgbString('224 242 254', 0.86);
+        context.lineWidth = 1.8;
+        context.lineCap = 'round';
+        context.beginPath();
+        context.moveTo(cursorX + 13.5, centerY - 0.6);
+        context.lineTo(cursorX + 16, centerY + 2.1);
+        context.lineTo(cursorX + 20.2, centerY - 3.4);
+        context.stroke();
+      }
+
+      context.restore();
+
+      cursorX += stepSize;
+
+      if (index >= steps.length - 1) {
+        return;
+      }
+
+      const nextX = cursorX + connectorWidth;
+      const connectorColor = steps[index].status === 'complete'
+        ? rgbaFromRgbString(currentTheme.rgb, 0.52)
+        : 'rgba(148, 163, 184, 0.36)';
+      context.strokeStyle = connectorColor;
+      context.lineWidth = 1.6;
+      context.lineCap = 'round';
+      context.beginPath();
+      context.moveTo(cursorX + 3, centerY);
+      context.lineTo(nextX - 6, centerY);
+      context.stroke();
+
+      context.fillStyle = connectorColor;
+      context.beginPath();
+      context.moveTo(nextX - 8, centerY - 3.6);
+      context.lineTo(nextX - 2, centerY);
+      context.lineTo(nextX - 8, centerY + 3.6);
+      context.closePath();
+      context.fill();
+
+      cursorX = nextX;
+    });
+
+    context.restore();
+  }
+
   function drawSparkStar(x, y, outerRadius, color, { innerRadius = outerRadius * 0.42, alpha = 1 } = {}) {
     context.save();
     context.translate(x, y);
@@ -1189,8 +1547,9 @@ export function createGame({
   }
 
   function renderEnemyAura(enemy, y, archetype, now) {
-    const pulse = 0.72 + Math.sin(now / 260 + enemy.bobOffset) * 0.14;
-    const isFrost = enemy.type === 'FROST';
+    const pulseBoost = enemy.phasePulseMs > 0 ? enemy.phasePulseMs / 720 : 0;
+    const pulse = 0.72 + Math.sin(now / 260 + enemy.bobOffset) * 0.14 + pulseBoost * 0.08;
+    const isFrost = archetype.auraStyle === 'frost';
     const outerRadius = enemy.radius * (isFrost ? 2.55 + pulse * 0.24 : 2.2 + pulse * 0.18);
     const aura = context.createRadialGradient(enemy.x, y, 0, enemy.x, y, outerRadius);
 
@@ -1433,6 +1792,337 @@ export function createGame({
     context.fill();
   }
 
+  function drawArcBolt(startX, startY, endX, endY, color, now, seed, {
+    width = 2,
+    amplitude = 6,
+    alpha = 0.78,
+  } = {}) {
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const distance = Math.hypot(dx, dy) || 1;
+    const normalX = -dy / distance;
+    const normalY = dx / distance;
+    const segments = 5;
+
+    context.save();
+    context.strokeStyle = rgbaFromRgbString(color, alpha);
+    context.lineWidth = width;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.beginPath();
+
+    for (let index = 0; index <= segments; index += 1) {
+      const progress = index / segments;
+      const sway = index === 0 || index === segments
+        ? 0
+        : Math.sin(now / 110 + seed + progress * 4.8) * amplitude * (1 - Math.abs(progress - 0.5));
+      const x = startX + dx * progress + normalX * sway;
+      const y = startY + dy * progress + normalY * sway;
+
+      if (index === 0) {
+        context.moveTo(x, y);
+      } else {
+        context.lineTo(x, y);
+      }
+    }
+
+    context.stroke();
+    context.restore();
+  }
+
+  function renderEmberConduit(enemy, y, archetype, now) {
+    const primed = getEnemyProgress(enemy) > 0;
+    const phaseBoost = enemy.phasePulseMs > 0 ? enemy.phasePulseMs / 720 : 0;
+    const pulse = 0.76 + Math.sin(now / 220 + enemy.bobOffset) * 0.16 + phaseBoost * 0.24;
+
+    context.fillStyle = archetype.bodySecondary;
+    context.beginPath();
+    context.moveTo(enemy.x, y - enemy.radius * 1.1);
+    context.lineTo(enemy.x + enemy.radius * 0.92, y - enemy.radius * 0.4);
+    context.lineTo(enemy.x + enemy.radius * 1.02, y + enemy.radius * 0.26);
+    context.lineTo(enemy.x + enemy.radius * 0.36, y + enemy.radius * 0.98);
+    context.lineTo(enemy.x - enemy.radius * 0.38, y + enemy.radius * 1.04);
+    context.lineTo(enemy.x - enemy.radius * 1.04, y + enemy.radius * 0.2);
+    context.lineTo(enemy.x - enemy.radius * 0.88, y - enemy.radius * 0.48);
+    context.closePath();
+    context.fill();
+
+    context.fillStyle = archetype.bodyPrimary;
+    context.beginPath();
+    context.moveTo(enemy.x, y - enemy.radius * 0.9);
+    context.lineTo(enemy.x + enemy.radius * 0.62, y - enemy.radius * 0.32);
+    context.lineTo(enemy.x + enemy.radius * 0.7, y + enemy.radius * 0.24);
+    context.lineTo(enemy.x + enemy.radius * 0.24, y + enemy.radius * 0.8);
+    context.lineTo(enemy.x - enemy.radius * 0.28, y + enemy.radius * 0.84);
+    context.lineTo(enemy.x - enemy.radius * 0.72, y + enemy.radius * 0.2);
+    context.lineTo(enemy.x - enemy.radius * 0.62, y - enemy.radius * 0.38);
+    context.closePath();
+    context.fill();
+
+    context.fillStyle = archetype.bodyShadow;
+    context.beginPath();
+    context.ellipse(enemy.x - 2, y + 8, enemy.radius * 0.46, enemy.radius * 0.52, 0, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = rgbaFromRgbString(archetype.outline, 0.9);
+    context.lineWidth = 3.2;
+    context.beginPath();
+    context.moveTo(enemy.x - enemy.radius * 0.32, y + enemy.radius * 0.52);
+    context.lineTo(enemy.x - enemy.radius * 0.56, y + enemy.radius * 1.04);
+    context.moveTo(enemy.x + enemy.radius * 0.08, y + enemy.radius * 0.58);
+    context.lineTo(enemy.x + enemy.radius * 0.3, y + enemy.radius * 1.08);
+    context.stroke();
+
+    context.strokeStyle = rgbaFromRgbString('249 115 22', primed ? 0.92 : 0.62);
+    context.lineWidth = primed ? 3.1 : 2.1;
+    context.lineCap = 'round';
+    context.beginPath();
+    context.moveTo(enemy.x - enemy.radius * 0.28, y - enemy.radius * 0.54);
+    context.lineTo(enemy.x - 4, y - enemy.radius * 0.14);
+    context.lineTo(enemy.x - enemy.radius * 0.16, y + enemy.radius * 0.34);
+    context.moveTo(enemy.x + enemy.radius * 0.18, y - enemy.radius * 0.6);
+    context.lineTo(enemy.x + enemy.radius * 0.02, y - enemy.radius * 0.08);
+    context.lineTo(enemy.x + enemy.radius * 0.22, y + enemy.radius * 0.38);
+    context.stroke();
+
+    if (primed) {
+      const coreGlow = context.createRadialGradient(enemy.x, y - 2, 0, enemy.x, y - 2, enemy.radius * 0.8);
+      coreGlow.addColorStop(0, rgbaFromRgbString('254 249 195', 0.94));
+      coreGlow.addColorStop(0.48, rgbaFromRgbString('250 204 21', 0.62 + phaseBoost * 0.14));
+      coreGlow.addColorStop(1, rgbaFromRgbString('250 204 21', 0));
+      context.fillStyle = coreGlow;
+      context.beginPath();
+      context.arc(enemy.x, y - 2, enemy.radius * 0.8, 0, Math.PI * 2);
+      context.fill();
+
+      context.fillStyle = archetype.core;
+      context.beginPath();
+      context.moveTo(enemy.x, y - enemy.radius * 0.34);
+      context.lineTo(enemy.x + enemy.radius * 0.28, y - 2);
+      context.lineTo(enemy.x, y + enemy.radius * 0.32);
+      context.lineTo(enemy.x - enemy.radius * 0.28, y - 2);
+      context.closePath();
+      context.fill();
+
+      drawArcBolt(
+        enemy.x - enemy.radius * 0.7,
+        y - enemy.radius * 0.28,
+        enemy.x - enemy.radius * 0.1,
+        y - 2,
+        archetype.chargeRgb,
+        now,
+        enemy.bobOffset + 0.4,
+        { width: 2.1, amplitude: 5.5, alpha: 0.88 },
+      );
+      drawArcBolt(
+        enemy.x + enemy.radius * 0.72,
+        y - enemy.radius * 0.36,
+        enemy.x + enemy.radius * 0.08,
+        y + 1,
+        archetype.chargeRgb,
+        now,
+        enemy.bobOffset + 1.3,
+        { width: 2.2, amplitude: 5.6, alpha: 0.84 },
+      );
+      drawSparkStar(enemy.x - enemy.radius * 0.18, y - enemy.radius * 0.96, 3.3, '#67e8f9', { alpha: 0.7 });
+      drawSparkStar(enemy.x + enemy.radius * 0.42, y - enemy.radius * 0.72, 2.8, '#a5f3fc', { alpha: 0.62 });
+    } else {
+      context.strokeStyle = rgbaFromRgbString('251 191 36', 0.22 + pulse * 0.1);
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(enemy.x - enemy.radius * 0.16, y - 2);
+      context.lineTo(enemy.x + enemy.radius * 0.16, y - 2);
+      context.stroke();
+      drawSparkStar(enemy.x + enemy.radius * 0.56, y - enemy.radius * 0.72, 2.1, '#a5f3fc', { alpha: 0.34 });
+    }
+  }
+
+  function renderTempestBloom(enemy, y, archetype, now) {
+    const primed = getEnemyProgress(enemy) > 0;
+    const phaseBoost = enemy.phasePulseMs > 0 ? enemy.phasePulseMs / 720 : 0;
+    const petalReach = primed ? 0.72 : 0.56;
+    const petalWidth = primed ? 8.6 : 7.4;
+    const petalHeight = primed ? 18 : 14.4;
+
+    context.save();
+    context.translate(enemy.x, y);
+
+    context.strokeStyle = rgbaFromRgbString('165 180 252', 0.42);
+    context.lineWidth = 2.6;
+    context.lineCap = 'round';
+    for (let index = 0; index < 3; index += 1) {
+      const drift = Math.sin(now / 260 + enemy.bobOffset + index) * 5;
+      context.beginPath();
+      context.moveTo(-6 + index * 6, enemy.radius * 0.08);
+      context.quadraticCurveTo(-10 + drift * 0.2, enemy.radius * 0.74, -14 + index * 12, enemy.radius * 1.18);
+      context.stroke();
+    }
+
+    for (let index = 0; index < 5; index += 1) {
+      const angle = (Math.PI * 2 * index) / 5 + now / 1800 + enemy.bobOffset * 0.08;
+
+      context.save();
+      context.rotate(angle);
+      context.fillStyle = archetype.bodySecondary;
+      context.beginPath();
+      context.ellipse(0, -enemy.radius * petalReach, petalWidth, petalHeight, 0, 0, Math.PI * 2);
+      context.fill();
+
+      context.fillStyle = archetype.bodyPrimary;
+      context.beginPath();
+      context.ellipse(0, -enemy.radius * (petalReach - 0.08), petalWidth * 0.58, petalHeight * 0.72, 0, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    }
+
+    const stormGlow = context.createRadialGradient(0, 0, 0, 0, 0, enemy.radius * 0.92);
+    stormGlow.addColorStop(0, rgbaFromRgbString(primed ? '251 146 60' : archetype.chargeRgb, 0.9));
+    stormGlow.addColorStop(0.48, rgbaFromRgbString(primed ? '249 115 22' : archetype.rgb, 0.46 + phaseBoost * 0.12));
+    stormGlow.addColorStop(1, rgbaFromRgbString(primed ? '249 115 22' : archetype.rgb, 0));
+    context.fillStyle = stormGlow;
+    context.beginPath();
+    context.arc(0, 0, enemy.radius * 0.92, 0, Math.PI * 2);
+    context.fill();
+
+    context.fillStyle = primed ? '#fb923c' : archetype.core;
+    context.beginPath();
+    context.arc(0, 0, primed ? enemy.radius * 0.28 : enemy.radius * 0.24, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = rgbaFromRgbString(archetype.outline, 0.92);
+    context.lineWidth = 1.8;
+    context.beginPath();
+    context.arc(0, 0, enemy.radius * 0.34, 0, Math.PI * 2);
+    context.stroke();
+
+    drawArcBolt(
+      -enemy.radius * 0.52,
+      -enemy.radius * 0.16,
+      enemy.radius * 0.1,
+      -enemy.radius * 0.02,
+      primed ? '251 146 60' : archetype.chargeRgb,
+      now,
+      enemy.bobOffset + 0.6,
+      { width: primed ? 2.1 : 1.8, amplitude: 4.8, alpha: primed ? 0.62 : 0.84 },
+    );
+    drawArcBolt(
+      enemy.radius * 0.42,
+      enemy.radius * 0.08,
+      -enemy.radius * 0.08,
+      enemy.radius * 0.18,
+      primed ? '251 146 60' : archetype.chargeRgb,
+      now,
+      enemy.bobOffset + 1.4,
+      { width: primed ? 2 : 1.8, amplitude: 4.6, alpha: primed ? 0.58 : 0.8 },
+    );
+
+    if (primed) {
+      drawSparkStar(-enemy.radius * 0.16, -enemy.radius * 0.86, 3, '#fb923c', { alpha: 0.68 });
+      drawSparkStar(enemy.radius * 0.36, -enemy.radius * 0.72, 2.7, '#fdba74', { alpha: 0.64 });
+    }
+
+    context.restore();
+  }
+
+  function renderFrostVolt(enemy, y, archetype, now) {
+    const primed = getEnemyProgress(enemy) > 0;
+    const phaseBoost = enemy.phasePulseMs > 0 ? enemy.phasePulseMs / 720 : 0;
+
+    context.save();
+    context.translate(enemy.x, y);
+
+    for (let index = 0; index < 4; index += 1) {
+      const angle = (Math.PI / 2) * index + Math.PI / 4;
+      const shardX = Math.cos(angle) * enemy.radius * 0.74;
+      const shardY = Math.sin(angle) * enemy.radius * 0.56;
+
+      context.save();
+      context.translate(shardX, shardY);
+      context.rotate(angle);
+      context.fillStyle = archetype.detail;
+      context.beginPath();
+      context.moveTo(0, -enemy.radius * 0.36);
+      context.lineTo(enemy.radius * 0.18, 0);
+      context.lineTo(0, enemy.radius * 0.36);
+      context.lineTo(-enemy.radius * 0.18, 0);
+      context.closePath();
+      context.fill();
+      context.restore();
+    }
+
+    context.fillStyle = archetype.bodySecondary;
+    context.beginPath();
+    context.moveTo(0, -enemy.radius * 1.02);
+    context.lineTo(enemy.radius * 0.62, -enemy.radius * 0.3);
+    context.lineTo(enemy.radius * 0.52, enemy.radius * 0.5);
+    context.lineTo(0, enemy.radius * 1.02);
+    context.lineTo(-enemy.radius * 0.52, enemy.radius * 0.5);
+    context.lineTo(-enemy.radius * 0.62, -enemy.radius * 0.3);
+    context.closePath();
+    context.fill();
+
+    context.fillStyle = archetype.bodyPrimary;
+    context.beginPath();
+    context.moveTo(0, -enemy.radius * 0.74);
+    context.lineTo(enemy.radius * 0.42, -enemy.radius * 0.22);
+    context.lineTo(enemy.radius * 0.32, enemy.radius * 0.4);
+    context.lineTo(0, enemy.radius * 0.72);
+    context.lineTo(-enemy.radius * 0.32, enemy.radius * 0.4);
+    context.lineTo(-enemy.radius * 0.42, -enemy.radius * 0.22);
+    context.closePath();
+    context.fill();
+
+    context.strokeStyle = rgbaFromRgbString('224 242 254', primed ? 0.84 : 0.58);
+    context.lineWidth = primed ? 2.8 : 2;
+    context.beginPath();
+    context.moveTo(-enemy.radius * 0.22, -enemy.radius * 0.34);
+    context.lineTo(-enemy.radius * 0.02, -enemy.radius * 0.06);
+    context.lineTo(-enemy.radius * 0.18, enemy.radius * 0.18);
+    context.moveTo(enemy.radius * 0.08, -enemy.radius * 0.42);
+    context.lineTo(enemy.radius * 0.24, -enemy.radius * 0.08);
+    context.lineTo(enemy.radius * 0.04, enemy.radius * 0.2);
+    context.stroke();
+
+    const coreGlow = context.createRadialGradient(0, 0, 0, 0, 0, enemy.radius * 0.86);
+    coreGlow.addColorStop(0, rgbaFromRgbString('240 249 255', 0.92));
+    coreGlow.addColorStop(0.42, rgbaFromRgbString(primed ? archetype.chargeRgb : '191 219 254', 0.44 + phaseBoost * 0.12));
+    coreGlow.addColorStop(1, rgbaFromRgbString(primed ? archetype.chargeRgb : '191 219 254', 0));
+    context.fillStyle = coreGlow;
+    context.beginPath();
+    context.arc(0, 0, enemy.radius * 0.86, 0, Math.PI * 2);
+    context.fill();
+
+    context.fillStyle = archetype.core;
+    context.beginPath();
+    context.arc(0, 0, primed ? enemy.radius * 0.2 : enemy.radius * 0.14, 0, Math.PI * 2);
+    context.fill();
+
+    if (primed) {
+      drawArcBolt(
+        -enemy.radius * 0.6,
+        -enemy.radius * 0.08,
+        -enemy.radius * 0.08,
+        0,
+        archetype.chargeRgb,
+        now,
+        enemy.bobOffset + 0.8,
+        { width: 2.2, amplitude: 5.2, alpha: 0.88 },
+      );
+      drawArcBolt(
+        enemy.radius * 0.58,
+        enemy.radius * 0.02,
+        enemy.radius * 0.1,
+        enemy.radius * 0.06,
+        archetype.chargeRgb,
+        now,
+        enemy.bobOffset + 1.5,
+        { width: 2.2, amplitude: 5, alpha: 0.86 },
+      );
+    }
+
+    context.restore();
+  }
+
   function renderPlayer(now) {
     const { player } = state;
     const bob = Math.sin(now / 620) * 2.6;
@@ -1576,9 +2266,19 @@ export function createGame({
     drawHealthBar(player.x - 40, playerY + 58, 82, player.hp / player.maxHp, '#34d399');
   }
 
+  const enemyRenderers = {
+    briarBeast: renderBriarBeast,
+    runeConstruct: renderRuneConstruct,
+    shadowWraith: renderShadowWraith,
+    emberConduit: renderEmberConduit,
+    tempestBloom: renderTempestBloom,
+    frostVolt: renderFrostVolt,
+  };
+
   function renderEnemy(enemy, now) {
     const y = getEnemyY(enemy, now);
     const archetype = getEnemyArchetype(enemy.type);
+    const renderEnemyBody = enemyRenderers[archetype.renderKey] ?? renderBriarBeast;
 
     context.fillStyle = 'rgba(0, 0, 0, 0.26)';
     context.beginPath();
@@ -1594,13 +2294,7 @@ export function createGame({
       context.fill();
     }
 
-    if (enemy.type === 'EMBER') {
-      renderBriarBeast(enemy, y, archetype, now);
-    } else if (enemy.type === 'STORM') {
-      renderRuneConstruct(enemy, y, archetype, now);
-    } else {
-      renderShadowWraith(enemy, y, archetype, now);
-    }
+    renderEnemyBody(enemy, y, archetype, now);
 
     if (enemy.hitFlash > 0) {
       context.fillStyle = rgbaFromRgbString(enemy.hitFlashColor ?? archetype.rgb, 0.22 * enemy.hitFlash);
@@ -1608,6 +2302,8 @@ export function createGame({
       context.arc(enemy.x, y, enemy.radius * 1.08, 0, Math.PI * 2);
       context.fill();
     }
+
+    renderEnemyGestureBadge(enemy, y, now);
 
     drawHealthBar(
       enemy.x - enemy.radius,

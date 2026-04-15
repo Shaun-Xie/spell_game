@@ -19,6 +19,7 @@ import {
 import { animate, stagger } from 'motion';
 import { Howl } from 'howler';
 import { GESTURE_MODE_LABEL } from './gestureClassifier.js';
+import { getGestureIconAsset } from './gestureIcons.js';
 import {
   HAND_CONNECTIONS,
   SPELL_THEME,
@@ -43,7 +44,7 @@ const ACTIVE_PRESENTATION = {
   candidateLabel: 'Raw Gesture',
   spellbookDescription: 'Single-hand spellcasting is currently active.',
   spellbookBody:
-    'Read the aura first: red means Fireball, yellow means Lightning, and blue-cyan means Freeze. Heal restores HP once per wave.',
+    'Read the aura first: red means Fireball, yellow means Lightning, and blue-cyan means Freeze. Combo foes show their live sequence above them. Heal restores HP once per wave.',
   spellbook: {
     fireball: { title: 'Fireball', hint: '✊' },
     freeze: { title: 'Freeze', hint: '👍' },
@@ -107,6 +108,10 @@ function setOptionalText(element, text) {
   }
 }
 
+function replaceSpacesWithCommas(value = '') {
+  return `${value}`.trim().split(/\s+/).filter(Boolean).join(', ');
+}
+
 export function createUI() {
   try {
     createIcons({
@@ -136,6 +141,7 @@ export function createUI() {
     appShell: document.getElementById('appShell'),
     fullscreenToggleButton: document.getElementById('fullscreenToggleButton'),
     fullscreenToggleLabel: document.getElementById('fullscreenToggleLabel'),
+    fullscreenHint: document.getElementById('fullscreenHint'),
     gameCanvas: document.getElementById('gameCanvas'),
     gameStateBadge: document.getElementById('gameStateBadge'),
     arenaHpValue: document.getElementById('arenaHpValue'),
@@ -159,6 +165,7 @@ export function createUI() {
     tutorialProgress: document.getElementById('tutorialProgress'),
     tutorialDescription: document.getElementById('tutorialDescription'),
     tutorialObjective: document.getElementById('tutorialObjective'),
+    tutorialSequence: document.getElementById('tutorialSequence'),
     tutorialHighlights: document.getElementById('tutorialHighlights'),
     tutorialContinueButton: document.getElementById('tutorialContinueButton'),
     tutorialContinueLabel: document.getElementById('tutorialContinueLabel'),
@@ -222,6 +229,7 @@ export function createUI() {
     'appShell',
     'fullscreenToggleButton',
     'fullscreenToggleLabel',
+    'fullscreenHint',
     'gameCanvas',
     'gameStateBadge',
     'arenaHpValue',
@@ -243,6 +251,7 @@ export function createUI() {
     'tutorialProgress',
     'tutorialDescription',
     'tutorialObjective',
+    'tutorialSequence',
     'tutorialHighlights',
     'tutorialContinueButton',
     'tutorialContinueLabel',
@@ -301,6 +310,8 @@ export function createUI() {
   const stageGestureLabel =
     refs.stageGestureBadge.querySelector('span') ?? refs.stageGestureBadge;
   let lastTutorialSignature = 'inactive';
+  let lastFullscreenActive = false;
+  let fullscreenHintTimeoutId = null;
   const confirmSound = (() => {
     try {
       return new Howl({
@@ -502,6 +513,29 @@ export function createUI() {
     refs.instructionOverlay.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
+  function hideFullscreenHint() {
+    if (fullscreenHintTimeoutId) {
+      window.clearTimeout(fullscreenHintTimeoutId);
+      fullscreenHintTimeoutId = null;
+    }
+
+    refs.fullscreenHint.classList.remove('is-visible');
+    refs.fullscreenHint.setAttribute('aria-hidden', 'true');
+  }
+
+  function showFullscreenHint() {
+    hideFullscreenHint();
+    void refs.fullscreenHint.offsetWidth;
+    refs.fullscreenHint.classList.add('is-visible');
+    refs.fullscreenHint.setAttribute('aria-hidden', 'false');
+
+    fullscreenHintTimeoutId = window.setTimeout(() => {
+      refs.fullscreenHint.classList.remove('is-visible');
+      refs.fullscreenHint.setAttribute('aria-hidden', 'true');
+      fullscreenHintTimeoutId = null;
+    }, 2350);
+  }
+
   function setFullscreenState(active, supported = true) {
     refs.fullscreenToggleButton.classList.toggle('hidden', !supported || active);
     refs.fullscreenToggleButton.setAttribute('aria-pressed', active ? 'true' : 'false');
@@ -514,6 +548,14 @@ export function createUI() {
       : 'Enter fullscreen';
     refs.fullscreenToggleLabel.textContent = '⛶';
     refs.appShell.classList.toggle('is-fullscreen', active);
+
+    if (active && !lastFullscreenActive) {
+      showFullscreenHint();
+    } else if (!active) {
+      hideFullscreenHint();
+    }
+
+    lastFullscreenActive = active;
   }
 
   function clearOverlay() {
@@ -682,6 +724,8 @@ export function createUI() {
         tutorial.continueLabel,
         tutorial.canContinue,
         tutorial.showSkip,
+        tutorial.sequenceProgress ?? 0,
+        ...(tutorial.sequence ?? []),
         ...(tutorial.highlights ?? []),
       ].join('|')
       : 'inactive';
@@ -691,6 +735,8 @@ export function createUI() {
 
     if (!isActive) {
       if (lastTutorialSignature !== 'inactive') {
+        refs.tutorialSequence.replaceChildren();
+        refs.tutorialSequence.classList.add('hidden');
         refs.tutorialHighlights.replaceChildren();
       }
       lastTutorialSignature = 'inactive';
@@ -713,6 +759,71 @@ export function createUI() {
     refs.tutorialContinueLabel.textContent = tutorial.continueLabel ?? 'Continue';
     refs.tutorialContinueButton.classList.toggle('hidden', !tutorial.canContinue);
     refs.tutorialSkipButton.classList.toggle('hidden', !tutorial.showSkip);
+
+    refs.tutorialSequence.replaceChildren();
+    const showSequence = (tutorial.sequence?.length ?? 0) > 1;
+    refs.tutorialSequence.classList.toggle('hidden', !showSequence);
+
+    if (showSequence) {
+      const label = document.createElement('p');
+      label.className = 'tutorial-sequence__label';
+      label.textContent = 'Combo sequence';
+
+      const row = document.createElement('div');
+      row.className = 'tutorial-sequence__row';
+
+      tutorial.sequence.forEach((spellName, index) => {
+        const theme = SPELL_THEME[spellName] ?? SPELL_THEME.Neutral;
+        const asset = getGestureIconAsset(spellName);
+        const status = index < (tutorial.sequenceProgress ?? 0)
+          ? 'complete'
+          : index === (tutorial.sequenceProgress ?? 0)
+            ? 'current'
+            : 'future';
+        const keepFutureVisible = tutorial.sequence.length === 2
+          && index === 1
+          && status === 'future';
+        const step = document.createElement('div');
+        step.className = `tutorial-sequence__step tutorial-sequence__step--${status}`;
+        if (keepFutureVisible) {
+          step.classList.add('tutorial-sequence__step--future-visible');
+        }
+        step.style.setProperty('--gesture-step-rgb', replaceSpacesWithCommas(theme.rgb));
+        step.setAttribute('aria-label', `${spellName} ${status}`);
+
+        if (asset) {
+          const icon = document.createElement('img');
+          icon.className = 'tutorial-sequence__icon';
+          icon.src = asset.src;
+          icon.alt = asset.label;
+          step.append(icon);
+        }
+
+        const spellLabel = document.createElement('span');
+        spellLabel.className = 'tutorial-sequence__spell';
+        spellLabel.textContent = spellName;
+        step.append(spellLabel);
+
+        if (status === 'complete') {
+          const check = document.createElement('span');
+          check.className = 'tutorial-sequence__check';
+          check.textContent = 'Done';
+          step.append(check);
+        }
+
+        row.append(step);
+
+        if (index < tutorial.sequence.length - 1) {
+          const connector = document.createElement('span');
+          connector.className = 'tutorial-sequence__connector';
+          connector.setAttribute('aria-hidden', 'true');
+          connector.textContent = '→';
+          row.append(connector);
+        }
+      });
+
+      refs.tutorialSequence.append(label, row);
+    }
 
     refs.tutorialHighlights.replaceChildren();
     (tutorial.highlights ?? []).forEach((highlight) => {
@@ -750,6 +861,7 @@ export function createUI() {
     setStageNotice,
     syncOverlaySize,
     dispose() {
+      hideFullscreenHint();
       resizeBinding.disconnect();
     },
   };

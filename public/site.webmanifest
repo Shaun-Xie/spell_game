@@ -1,0 +1,22 @@
+{
+  "name": "Mage Hands",
+  "short_name": "Mage Hands",
+  "description": "Browser-based spellcasting battles driven by live hand gestures.",
+  "theme_color": "#050914",
+  "background_color": "#050914",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -6,59 +6,17 @@ export const SPELL_THEME = {
   Heal: { accent: '#34d399', rgb: '52 211 153' },
 };
 
-export const ENEMY_ARCHETYPES = {
-  EMBER: {
-    key: 'EMBER',
-    label: 'Briar Beast',
-    spell: 'Fireball',
-    rgb: '248 113 113',
-    accent: '#f87171',
-    core: '#fde68a',
-    outline: '71 48 32',
-    bodyPrimary: '#57412b',
-    bodySecondary: '#7c5a3b',
-    bodyShadow: '#352516',
-    detail: '#84cc16',
-    highlight: '#d6b98b',
-    auraMist: '#fecaca',
-  },
-  STORM: {
-    key: 'STORM',
-    label: 'Rune Construct',
-    spell: 'Lightning',
-    rgb: '250 204 21',
-    accent: '#facc15',
-    core: '#fff8c2',
-    outline: '82 94 114',
-    bodyPrimary: '#4b5563',
-    bodySecondary: '#94a3b8',
-    bodyShadow: '#1f2937',
-    detail: '#cbd5e1',
-    highlight: '#fef08a',
-    auraMist: '#fef3c7',
-  },
-  FROST: {
-    key: 'FROST',
-    label: 'Shadow Wraith',
-    spell: 'Freeze',
-    rgb: '125 211 252',
-    accent: '#7dd3fc',
-    core: '#e0f2fe',
-    outline: '15 23 42',
-    bodyPrimary: '#0f172a',
-    bodySecondary: '#334155',
-    bodyShadow: '#020617',
-    detail: '#94a3b8',
-    highlight: '#e2e8f0',
-    auraMist: '#dbeafe',
-  },
-};
-
-export const ENEMY_ARCHETYPE_KEYS = Object.keys(ENEMY_ARCHETYPES);
-
-export function getEnemyArchetype(enemyType) {
-  return ENEMY_ARCHETYPES[enemyType] ?? ENEMY_ARCHETYPES.EMBER;
-}
+export {
+  COMBO_ENEMY_ARCHETYPE_KEYS,
+  ENEMY_ARCHETYPE_KEYS,
+  ENEMY_ARCHETYPES,
+  NORMAL_ENEMY_ARCHETYPE_KEYS,
+  getEnemyArchetype,
+  getEnemySequence,
+  getEnemySpawnPool,
+  getWaveComboLimit,
+  isComboEnemyType,
+} from './enemies.js';
 
 export const HAND_CONNECTIONS = [
   [0, 1], [1, 2], [2, 3], [3, 4],

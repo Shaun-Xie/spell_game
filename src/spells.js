@@ -19,7 +19,7 @@ export const SPELL_CONFIG = {
   },
   Freeze: {
     damage: 14,
-    projectileSpeed: 560,
+    projectileSpeed: 820,
     projectileRadius: 11,
     projectileLifeMs: 1700,
     castPulseMs: 680,

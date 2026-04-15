@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tile" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0E1B30"/>
+      <stop offset="1" stop-color="#050914"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="24" y1="12" x2="42" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FEF3C7"/>
+      <stop offset="0.55" stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#6EE7F9"/>
+    </linearGradient>
+    <radialGradient id="aura" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(32 32) rotate(90) scale(22)">
+      <stop stop-color="#6EE7F9" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#6EE7F9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="16" fill="url(#tile)"/>
+  <rect x="6.75" y="6.75" width="50.5" height="50.5" rx="15.25" stroke="#9FDBFF" stroke-opacity="0.22" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="22" fill="url(#aura)"/>
+  <path
+    d="M37.5 10L19 35H28.6L24.5 54L45 28.4H35.1L37.5 10Z"
+    fill="url(#bolt)"
+  />
+  <path
+    d="M33.6 18L26.7 31.4H31.8L29.5 42.2L38 29.4H33.8L33.6 18Z"
+    fill="#FFF8E6"
+    fill-opacity="0.36"
+  />
+</svg>

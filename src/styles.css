@@ -124,6 +124,39 @@ body {
   transform: translateY(-0.02em);
 }
 
+.fullscreen-toggle.hidden {
+  display: none;
+}
+
+.fullscreen-hint {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  z-index: 32;
+  max-width: min(calc(100% - 2rem), 20rem);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 15, 28, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 34px rgba(0, 0, 0, 0.24);
+  padding: 0.52rem 0.9rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-align: center;
+  text-transform: uppercase;
+  color: #f8fafc;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -0.5rem);
+  backdrop-filter: blur(18px);
+}
+
+.fullscreen-hint.is-visible {
+  animation: fullscreen-hint-fade 2.35s ease forwards;
+}
+
 .app-shell.is-fullscreen,
 .app-shell:fullscreen {
   padding: 0.8rem 0.9rem;
@@ -1100,6 +1133,7 @@ body {
   grid-template-areas:
     "header header"
     "description objective"
+    "sequence objective"
     "highlights footer";
   align-items: start;
   gap: 0.52rem 0.85rem;
@@ -1175,6 +1209,119 @@ body {
   color: #f8fafc;
 }
 
+.tutorial-sequence {
+  grid-area: sequence;
+  display: grid;
+  gap: 0.45rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.56rem 0.64rem;
+}
+
+.tutorial-sequence.hidden {
+  display: none;
+}
+
+.tutorial-sequence__label {
+  margin: 0;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(224, 242, 254, 0.72);
+}
+
+.tutorial-sequence__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.48rem;
+}
+
+.tutorial-sequence__step {
+  --gesture-step-rgb: 110, 231, 249;
+  position: relative;
+  min-width: 5.7rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.22rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.8);
+  padding: 0.46rem 0.52rem 0.44rem;
+}
+
+.tutorial-sequence__step--current {
+  border-color: rgba(var(--gesture-step-rgb), 0.72);
+  background:
+    linear-gradient(180deg, rgba(var(--gesture-step-rgb), 0.18), rgba(var(--gesture-step-rgb), 0.08)),
+    rgba(15, 23, 42, 0.86);
+  box-shadow:
+    0 0 0 1px rgba(var(--gesture-step-rgb), 0.18),
+    0 10px 24px rgba(0, 0, 0, 0.2);
+}
+
+.tutorial-sequence__step--complete {
+  border-color: rgba(var(--gesture-step-rgb), 0.28);
+  background:
+    linear-gradient(180deg, rgba(var(--gesture-step-rgb), 0.12), rgba(var(--gesture-step-rgb), 0.04)),
+    rgba(15, 23, 42, 0.74);
+}
+
+.tutorial-sequence__step--future {
+  opacity: 0.6;
+}
+
+.tutorial-sequence__step--future-visible {
+  opacity: 1;
+}
+
+.tutorial-sequence__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+}
+
+.tutorial-sequence__step--future .tutorial-sequence__icon {
+  opacity: 0.62;
+}
+
+.tutorial-sequence__step--future-visible .tutorial-sequence__icon {
+  opacity: 1;
+}
+
+.tutorial-sequence__step--complete .tutorial-sequence__icon {
+  opacity: 0.56;
+}
+
+.tutorial-sequence__spell {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f8fafc;
+}
+
+.tutorial-sequence__check {
+  position: absolute;
+  top: 0.34rem;
+  right: 0.38rem;
+  border-radius: 9999px;
+  background: rgba(224, 242, 254, 0.12);
+  padding: 0.12rem 0.32rem;
+  font-size: 0.48rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(224, 242, 254, 0.82);
+}
+
+.tutorial-sequence__connector {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: rgba(148, 163, 184, 0.64);
+}
+
 .tutorial-panel__highlights {
   grid-area: highlights;
   margin-top: 0;
@@ -1229,6 +1376,10 @@ body {
     background-color 180ms ease;
 }
 
+.tutorial-panel__button.hidden {
+  display: none;
+}
+
 .tutorial-panel__button:hover {
   transform: translateY(-1px);
 }
@@ -1246,6 +1397,24 @@ body {
 
 .scanner-line {
   animation: scanner 2.8s ease-in-out infinite;
+}
+
+@keyframes fullscreen-hint-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -0.55rem);
+  }
+
+  12%,
+  62% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -0.35rem);
+  }
 }
 
 @media (min-width: 1024px) {
@@ -1410,6 +1579,7 @@ body {
       "header"
       "description"
       "objective"
+      "sequence"
       "highlights"
       "footer";
     width: 100%;
@@ -1423,6 +1593,15 @@ body {
 
   .tutorial-panel__progress {
     padding: 0.35rem 0.6rem;
+  }
+
+  .tutorial-sequence__row {
+    gap: 0.38rem;
+  }
+
+  .tutorial-sequence__step {
+    min-width: 5rem;
+    padding-inline: 0.46rem;
   }
 
   .tutorial-panel__footer {
