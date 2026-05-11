@@ -1,140 +1,125 @@
 # Mage Hands
 
-Mage Hands is a browser-based spellcasting battle demo built with Vite, vanilla JavaScript, and HTML5 canvas. The current build combines a polished webcam tracking interface with a simple side-view combat lane: the player mage defends the left side of the arena while enemies advance from the right.
+Mage Hands is a gesture-controlled browser game that turns live webcam hand poses into spellcasting combat. Built with Vite, vanilla JavaScript, MediaPipe Hand Landmarker, and HTML5 canvas, it pairs real-time computer vision with a polished wave-defense arena.
 
-## Project overview
+The player defends the left side of the battlefield while enemies advance from the right. Stable one-hand poses map to spells, enemy auras communicate weaknesses, and later waves introduce combo enemies that require short spell sequences.
 
-- Webcam hand tracking runs in the browser with MediaPipe Hand Landmarker.
-- The active control scheme is legacy one-hand casting only.
-- Stable confirmed gestures trigger gameplay spells inside the battle lane.
-- The page opens to a main menu, then a short instruction overlay, then a guided in-game tutorial before the real wave battle begins.
-- The game is designed for a quick class/demo presentation: readable, responsive, and visually polished without heavy asset requirements.
+## Highlights
 
-## Current active controls
-
-- `Closed fist` -> `Fireball`
-- `Index finger only` -> `Lightning`
-- `Index + middle fingers` -> `Heal`
-- `Thumbs up` -> `Freeze`
-
-If no mapped pose is held steadily enough, the HUD shows `No spell`.
+- Real-time hand tracking in the browser with MediaPipe Hand Landmarker.
+- Custom gesture classifier with pose stabilization, cooldown handling, and spell mapping.
+- Canvas-based battle arena with waves, enemy archetypes, combo sequences, spell effects, HP, score, and restart flow.
+- Guided tutorial that teaches gestures, aura matching, healing, and combo enemies before live waves begin.
+- Responsive interface with camera/model status feedback, retry handling, fullscreen support, and GitHub Pages deployment.
 
 ## Gameplay
 
-- The player mage is anchored on the left side of the battlefield.
-- Enemies now arrive in distinct waves instead of an endless stream.
-- Each wave spawns on the right and advances left across the combat lane.
-- There are three enemy archetypes:
-  - `Briar Beast` has a red aura and is defeated by `Fireball`
-  - `Rune Construct` has a yellow aura and is defeated by `Lightning`
-  - `Shadow Wraith` has a blue-cyan aura and is defeated by `Freeze`
-- Matching the correct spell defeats that enemy in one hit and awards score.
-- Using the wrong attack spell shows impact feedback, but the enemy survives.
-- `Heal` restores player HP and never damages enemies.
-- `Heal` is limited to one use per wave and refreshes when the next combat wave begins.
-- Click `Play`, read the short instruction panel, then begin the guided tutorial.
-- The tutorial teaches gesture casting, aura matching, the three enemy weaknesses, heal timing, and the overall lane flow.
-- Each enemy lesson requires the correct spell before the tutorial advances.
-- The tutorial can be skipped from the in-game tutorial panel if you want to jump straight to Wave 1.
-- When a wave is cleared, the game enters a short intermission before the next wave begins.
-- Later waves now scale up faster through larger enemy counts, faster movement, tighter spawn pacing, and denser concurrent pressure.
-- The battle ends when player HP reaches `0`.
-- Use the on-screen restart button or press `R` / `Enter` after game over to reset the fight.
+- Start from the main menu, review the rules, then complete the guided tutorial or skip into Wave 1.
+- Match each enemy aura with the correct spell to defeat standard enemies in one hit.
+- Later enemies show a two-step spell sequence above them and must be hit in that order.
+- Heal restores player HP once per wave and refreshes at the start of the next wave.
+- The battle ends when player HP reaches 0. Use the restart button, `R`, or `Enter` to play again.
 
-## Local setup
+## Controls
+
+| Gesture | Spell | Primary use |
+| --- | --- | --- |
+| Closed fist | Fireball | Red aura enemies, including Briar Beast |
+| Index finger only | Lightning | Yellow aura enemies, including Rune Construct |
+| Thumbs up | Freeze | Blue-cyan aura enemies, including Shadow Wraith |
+| Index + middle fingers | Heal | Restore HP once per wave |
+
+If no mapped pose is held steadily enough, the HUD shows `No spell`.
+
+## Tech Stack
+
+- Vite for local development and production builds.
+- Vanilla JavaScript ES modules for application structure.
+- HTML5 canvas for gameplay rendering and effects.
+- MediaPipe Tasks Vision for browser hand landmark detection.
+- Tailwind CSS v4 with `@tailwindcss/vite` for styling.
+- Lucide, Motion, and Howler for icons, interface animation, and lightweight sound feedback.
+
+## Getting Started
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Run the local development server:
+
+```bash
 npm run dev
 ```
 
-Open the Vite URL shown in the terminal, allow webcam access, and keep one hand inside the tracking panel.
+Open the Vite URL shown in the terminal, allow webcam access, and keep one hand inside the tracking panel. Vite `8.0.5` requires Node `20.19+` or `22.12+`.
 
-Vite `8.0.5` in this project requires Node `20.19+` or `22.12+`.
+## Production Build
 
-To test the built app locally, serve it instead of opening `dist/index.html` directly:
-
-```bash
-npm run preview
-```
-
-## Build instructions
+Create a production build:
 
 ```bash
 npm run build
 ```
 
-## GitHub Pages deployment notes
+Preview the built site locally:
 
-- The Vite base path is configured for project-site deployment from the `spell_game` repository.
-- The app expects to be served from `/spell_game/`.
-- Production assets are emitted into `dist/` and are ready for GitHub Pages publishing after `npm run build`.
+```bash
+npm run preview
+```
 
-## Deploy to GitHub Pages
+Use `npm run preview` or a static server for the built app. Opening `dist/index.html` directly with `file://` does not provide the secure browser context required for webcam access.
 
-1. Go to `Settings > Pages` in the GitHub repository.
-2. Under `Build and deployment`, choose `GitHub Actions` as the source.
-3. Push to `main` to trigger `.github/workflows/deploy.yml` and publish the site.
+## Deployment
 
-## Libraries used
+The project includes a GitHub Actions workflow at `.github/workflows/deploy.yml` for GitHub Pages.
 
-- `Vite` for local development and production builds
-- `Tailwind CSS v4` with `@tailwindcss/vite` for styling
-- `@mediapipe/tasks-vision` for browser hand landmark detection
-- `Lucide` for UI icons
-- `motion` for restrained interface animation
-- `howler` for lightweight spell-confirm sound feedback
+1. In the repository settings, set Pages to deploy from GitHub Actions.
+2. Push to `main`.
+3. The workflow installs dependencies, builds the Vite app, uploads `dist/`, and deploys the site.
 
-## Project structure
+The Vite base path is currently configured for a repository named `spell_game`. If the repository name changes, update `githubPagesBase` in `vite.config.js`.
+
+## Project Structure
 
 ```text
 spell_game/
   index.html
   package.json
   vite.config.js
+  public/
+    mediapipe/wasm/
   src/
-    camera.js
-    game.js
-    gestureClassifier.js
-    handTracker.js
-    main.js
-    spells.js
-    styles.css
-    ui.js
-    utils.js
+    camera.js              Webcam startup and teardown
+    enemies.js             Enemy archetypes and wave helpers
+    game.js                Game state, tutorial flow, waves, and canvas rendering
+    gestureClassifier.js   Landmark heuristics, smoothing, and spell mapping
+    handTracker.js         MediaPipe model and WASM initialization
+    main.js                Application startup and render loop coordination
+    spells.js              Spell behavior, projectiles, beams, and effects
+    styles.css             Application styling
+    ui.js                  DOM references and HUD updates
+    utils.js               Shared math and utility helpers
 ```
 
-## Tuning guide
+## Tuning
 
-Main gameplay tuning points:
+- Gameplay values live in `src/game.js` under `GAME_SETTINGS`, `WAVE_SETTINGS`, and `MATCH_SETTINGS`.
+- Spell numbers live in `src/spells.js` under `SPELL_CONFIG`.
+- Gesture thresholds and timing live in `src/gestureClassifier.js` under `GESTURE_THRESHOLDS` and `STABILITY_SETTINGS`.
+- MediaPipe initialization options live in `src/handTracker.js` under `HAND_TRACKER_DEFAULTS`.
 
-- Enemy speed: `src/game.js` inside `GAME_SETTINGS.enemySpeedMin` and `GAME_SETTINGS.enemySpeedMax`
-- Player HP: `src/game.js` inside `GAME_SETTINGS.playerMaxHp`
-- Wave size, intermission timing, spawn pacing, and concurrent-enemy caps: `src/game.js` inside `WAVE_SETTINGS`
-- Base spawn timing: `src/game.js` inside `GAME_SETTINGS.spawnIntervalMinMs` and `GAME_SETTINGS.spawnIntervalMaxMs`
-- Heal availability per wave: `src/game.js` inside the wave state and `castSpell(...)`
-- Contact damage: `src/game.js` inside `GAME_SETTINGS.enemyContactDamage`
-- Wrong-spell feedback and pushback: `src/game.js` inside `MATCH_SETTINGS`
-- Fireball / lightning / heal / freeze numbers: `src/spells.js` inside `SPELL_CONFIG`
-- Freeze cast pulse and projectile tuning: `src/spells.js` inside `SPELL_CONFIG.Freeze`
-- Projectile speed: `src/spells.js` inside `SPELL_CONFIG.Fireball.projectileSpeed`
+## Browser Notes
 
-Gesture tuning points:
+- Webcam access requires `localhost` or HTTPS hosting.
+- Gesture accuracy depends on lighting, camera quality, hand framing, and pose clarity.
+- Video processing runs in the browser; there is no backend service in this project.
+- The MediaPipe WASM runtime is served from the local `public/mediapipe/wasm` assets with a CDN fallback. The hand landmark model is loaded from MediaPipe's hosted model URL.
 
-- One-hand thresholds: `src/gestureClassifier.js` inside `GESTURE_THRESHOLDS`
-- Temporal smoothing and cooldown: `src/gestureClassifier.js` inside `STABILITY_SETTINGS`
-- Active mapping and mode label: `src/gestureClassifier.js`
+## Future Improvements
 
-UI tuning points:
-
-- Theme colors, spacing, and panel styling: `src/styles.css`
-- HUD text and panel copy: `index.html` and `src/ui.js`
-
-## Known limitations
-
-- Webcam gesture reliability still depends on lighting, framing, and camera quality.
-- The app uses frontend-only browser APIs, so it requires webcam permission and a supported browser.
-- Opening `dist/index.html` directly with `file://` will not provide a secure webcam context. Use `npm run dev`, `npm run preview`, or HTTPS hosting instead.
-- MediaPipe model assets are loaded at runtime, so offline or restricted-network environments may need additional setup later.
-- Gameplay balance is intentionally simple and tuned for readability, not depth.
-- Live webcam calibration was not visually verified in this headless environment.
+- Self-host the hand landmark model for fully offline deployment.
+- Add keyboard or pointer fallback controls for accessibility and easier testing.
+- Expand the spell roster, enemy behaviors, and score persistence.

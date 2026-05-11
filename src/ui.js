@@ -40,7 +40,7 @@ const STATUS_BADGE_CLASS_MAP = {
 
 const ACTIVE_PRESENTATION = {
   label: GESTURE_MODE_LABEL,
-  pill: 'Legacy One-Hand',
+  pill: 'One-Hand',
   candidateLabel: 'Raw Gesture',
   spellbookDescription: 'Single-hand spellcasting is currently active.',
   spellbookBody:

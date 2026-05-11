@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 
-// Change this if the GitHub Pages project/repository path changes later.
+// Update this if the GitHub Pages project/repository path changes.
 const githubPagesBase = '/spell_game/';
 
 export default defineConfig({

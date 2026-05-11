@@ -1,7 +1,7 @@
 {
-  "name": "spell_game",
+  "name": "mage-hands",
   "version": "0.1.0",
-  "description": "Mage Hands browser prototype for webcam-driven spell casting.",
+  "description": "A gesture-controlled browser game that turns webcam hand poses into spellcasting combat.",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,8 +16,10 @@
     "tailwindcss",
     "vite"
   ],
-  "author": "",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.34",
     "@tailwindcss/vite": "^4.2.2",

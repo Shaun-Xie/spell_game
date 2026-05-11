@@ -1,7 +1,7 @@
 import { averagePoint, calculateAngle, distance2D } from './utils.js';
 
-export const GESTURE_MODE = 'legacy_one_hand';
-export const GESTURE_MODE_LABEL = 'Legacy one-hand';
+export const GESTURE_MODE = 'one_hand';
+export const GESTURE_MODE_LABEL = 'One-hand';
 
 export const GESTURE_THRESHOLDS = {
   fingerStraightAngle: 158,
@@ -323,7 +323,7 @@ export function classifyGesture(landmarks, handedness, thresholds = GESTURE_THRE
   };
 }
 
-export function classifyLegacyOneHandGesture(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
+export function classifyOneHandGesture(landmarks, handedness, thresholds = GESTURE_THRESHOLDS) {
   return classifyGesture(landmarks, handedness, thresholds);
 }
 
@@ -405,7 +405,7 @@ export function createGestureController({ stabilitySettings = {} } = {}) {
       return observeNoHand(now);
     }
 
-    const classification = classifyLegacyOneHandGesture(
+    const classification = classifyOneHandGesture(
       detection.landmarks,
       detection.handedness,
     );
