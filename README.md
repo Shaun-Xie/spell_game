@@ -80,12 +80,12 @@ The project includes a GitHub Actions workflow at `.github/workflows/deploy.yml`
 2. Push to `main`.
 3. The workflow installs dependencies, builds the Vite app, uploads `dist/`, and deploys the site.
 
-The Vite base path is currently configured for a repository named `spell_game`. If the repository name changes, update `githubPagesBase` in `vite.config.js`.
+The Vite base path is currently configured for a repository named `mage_hands`. If the repository name changes, update `githubPagesBase` in `vite.config.js`.
 
 ## Project Structure
 
 ```text
-spell_game/
+mage_hands/
   index.html
   package.json
   vite.config.js
